@@ -7,7 +7,7 @@ const updateContactSchema = z.object({
   headline: z.string().optional(),
   company: z.string().optional(),
   title: z.string().optional(),
-  platform: z.enum(["x", "linkedin"]).nullable().optional(),
+  platform: z.enum(["x", "linkedin", "gmail", "substack"]).nullable().optional(),
   platformUserId: z.string().optional(),
   profileUrl: z.string().optional(),
   avatarUrl: z.string().optional(),
