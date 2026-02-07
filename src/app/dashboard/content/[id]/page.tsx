@@ -5,7 +5,7 @@ export default async function ContentDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Content Editor</h1>
+      <h1 className="text-heading-1">Content Editor</h1>
       <Card>
         <CardHeader>
           <CardTitle>Content {id}</CardTitle>

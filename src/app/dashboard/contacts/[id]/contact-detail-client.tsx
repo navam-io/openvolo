@@ -106,7 +106,7 @@ export function ContactDetailClient({ contact, tasks }: ContactDetailClientProps
             </Button>
           </Link>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">{contact.name}</h1>
+            <h1 className="text-heading-1">{contact.name}</h1>
             <div className="flex items-center gap-2 mt-1">
               {contact.company && (
                 <span className="text-muted-foreground">{contact.company}</span>

@@ -2,15 +2,15 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const priorityColors: Record<string, string> = {
-  low: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-  medium: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-  high: "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300",
-  urgent: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
+  low: "bg-chart-1/15 text-chart-1 border-chart-1/25",
+  medium: "bg-chart-2/15 text-chart-2 border-chart-2/25",
+  high: "bg-chart-4/15 text-chart-4 border-chart-4/25",
+  urgent: "bg-destructive/15 text-destructive border-destructive/25",
 };
 
 export function PriorityBadge({ priority }: { priority: string }) {
   return (
-    <Badge variant="outline" className={cn("border-0", priorityColors[priority])}>
+    <Badge variant="outline" className={cn("font-medium", priorityColors[priority])}>
       {priority}
     </Badge>
   );

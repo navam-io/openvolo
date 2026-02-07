@@ -3,6 +3,30 @@ import { db } from "@/lib/db/client";
 import { contacts, tasks, campaigns, contentItems } from "@/lib/db/schema";
 import type { Contact, Task } from "@/lib/db/types";
 
+export interface FunnelDistribution {
+  stage: string;
+  count: number;
+}
+
+const FUNNEL_STAGES = ["prospect", "engaged", "qualified", "opportunity", "customer", "advocate"] as const;
+
+export function getFunnelDistribution(): FunnelDistribution[] {
+  const rows = db
+    .select({
+      stage: contacts.funnelStage,
+      count: count(),
+    })
+    .from(contacts)
+    .groupBy(contacts.funnelStage)
+    .all();
+
+  const countMap = new Map<string, number>(rows.map((r) => [r.stage, r.count]));
+  return FUNNEL_STAGES.map((stage) => ({
+    stage,
+    count: countMap.get(stage) ?? 0,
+  }));
+}
+
 export interface DashboardMetrics {
   totalContacts: number;
   activeCampaigns: number;

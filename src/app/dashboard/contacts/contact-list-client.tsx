@@ -136,7 +136,7 @@ export function ContactListClient({
             </TableHeader>
             <TableBody>
               {contacts.map((contact) => (
-                <TableRow key={contact.id}>
+                <TableRow key={contact.id} className="hover:bg-accent/30 transition-colors">
                   <TableCell>
                     <Link
                       href={`/dashboard/contacts/${contact.id}`}

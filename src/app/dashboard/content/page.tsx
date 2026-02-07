@@ -1,31 +1,23 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { FileText } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
 
 export default function ContentPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Content</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-heading-1">Content</h1>
+        <p className="text-muted-foreground mt-1">
           Create, schedule, and publish content across platforms.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            No content yet
-          </CardTitle>
-          <CardDescription>
-            Content library will be available in Phase 3.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            AI-assisted content creation with Tiptap editor and platform-specific formatting.
-          </p>
-        </CardContent>
+      <Card className="border-border/50">
+        <EmptyState
+          icon={FileText}
+          title="No content yet"
+          description="AI-assisted content creation with platform-specific formatting. Content library will be available in Phase 3."
+        />
       </Card>
     </div>
   );

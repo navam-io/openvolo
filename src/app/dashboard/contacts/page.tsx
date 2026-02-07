@@ -16,8 +16,8 @@ export default async function ContactsPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Contacts</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-heading-1">Contacts</h1>
+        <p className="text-muted-foreground mt-1">
           Manage your CRM contacts across platforms.
         </p>
       </div>

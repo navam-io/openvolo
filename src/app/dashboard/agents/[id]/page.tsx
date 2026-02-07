@@ -5,7 +5,7 @@ export default async function AgentRunDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Agent Run</h1>
+      <h1 className="text-heading-1">Agent Run</h1>
       <Card>
         <CardHeader>
           <CardTitle>Run {id}</CardTitle>

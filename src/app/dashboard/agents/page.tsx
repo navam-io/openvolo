@@ -1,32 +1,23 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Bot } from "lucide-react";
+import { EmptyState } from "@/components/empty-state";
 
 export default function AgentsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Agents</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-heading-1">Agents</h1>
+        <p className="text-muted-foreground mt-1">
           Monitor and manage AI agent runs on a Kanban board.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Bot className="h-5 w-5" />
-            No agent runs yet
-          </CardTitle>
-          <CardDescription>
-            Agent infrastructure will be available in Phase 2.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Kanban board with Queued, Running, Completed, and Failed columns.
-            Live SSE updates and step-by-step execution traces.
-          </p>
-        </CardContent>
+      <Card className="border-border/50">
+        <EmptyState
+          icon={Bot}
+          title="No agent runs yet"
+          description="Kanban board with Queued, Running, Completed, and Failed columns. Live SSE updates and step-by-step execution traces. Agent infrastructure will be available in Phase 2."
+        />
       </Card>
     </div>
   );
