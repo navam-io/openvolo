@@ -33,12 +33,13 @@ export async function GET(req: NextRequest) {
   }
 
   // Validate PKCE state
-  const codeVerifier = getPkceState(state);
-  if (!codeVerifier) {
+  const pkceEntry = getPkceState(state);
+  if (!pkceEntry) {
     return NextResponse.redirect(
       new URL("/dashboard/settings?error=invalid_state", req.url)
     );
   }
+  const { codeVerifier } = pkceEntry;
 
   try {
     const { clientId, clientSecret } = getXClientCredentials();
@@ -69,10 +70,13 @@ export async function GET(req: NextRequest) {
     }
 
     const tokenData = await tokenRes.json();
+    // X returns the actually-granted scopes in the token response
+    const grantedScopes: string = tokenData.scope ?? "";
     const creds: PlatformCredentials = {
       accessToken: tokenData.access_token,
       refreshToken: tokenData.refresh_token,
       expiresAt: Math.floor(Date.now() / 1000) + tokenData.expires_in,
+      grantedScopes,
     };
 
     // Fetch user profile from X API

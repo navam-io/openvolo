@@ -9,6 +9,7 @@ import {
   Loader2,
   RefreshCw,
   Unplug,
+  ArrowUpCircle,
 } from "lucide-react";
 
 type ConnectionStatus = "disconnected" | "connected" | "needs_reauth";
@@ -19,9 +20,11 @@ interface PlatformConnectionCardProps {
   accountHandle?: string;
   lastSyncedAt?: number | null;
   status: ConnectionStatus;
+  syncCapable?: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
   onSync: () => void;
+  onEnableSync?: () => void;
   connecting?: boolean;
   syncing?: boolean;
   disconnecting?: boolean;
@@ -42,9 +45,11 @@ export function PlatformConnectionCard({
   accountHandle,
   lastSyncedAt,
   status,
+  syncCapable,
   onConnect,
   onDisconnect,
   onSync,
+  onEnableSync,
   connecting,
   syncing,
   disconnecting,
@@ -84,9 +89,14 @@ export function PlatformConnectionCard({
             Last synced {formatRelativeTime(lastSyncedAt)}
           </p>
         )}
+        {status === "connected" && !syncCapable && (
+          <p className="text-xs text-muted-foreground">
+            Contact sync requires X API Basic tier ($200/mo)
+          </p>
+        )}
         {status === "disconnected" && (
           <p className="text-sm text-muted-foreground">
-            Connect via OAuth 2.0 to import contacts
+            Connect via OAuth 2.0 to post and import contacts
           </p>
         )}
         {status === "needs_reauth" && (
@@ -113,19 +123,35 @@ export function PlatformConnectionCard({
 
         {status === "connected" && (
           <>
-            <Button
-              onClick={onSync}
-              variant="outline"
-              size="sm"
-              disabled={syncing}
-            >
-              {syncing ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="mr-2 h-4 w-4" />
-              )}
-              {syncing ? "Syncing..." : "Sync Now"}
-            </Button>
+            {syncCapable ? (
+              <Button
+                onClick={onSync}
+                variant="outline"
+                size="sm"
+                disabled={syncing}
+              >
+                {syncing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                {syncing ? "Syncing..." : "Sync Now"}
+              </Button>
+            ) : onEnableSync ? (
+              <Button
+                onClick={onEnableSync}
+                variant="outline"
+                size="sm"
+                disabled={connecting}
+              >
+                {connecting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <ArrowUpCircle className="mr-2 h-4 w-4" />
+                )}
+                Enable Contact Sync
+              </Button>
+            ) : null}
             <Button
               onClick={onDisconnect}
               variant="ghost"

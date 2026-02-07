@@ -36,20 +36,24 @@ function toProfile(xUser: XUser): PlatformUserProfile {
 export class XPlatformAdapter implements PlatformAdapter {
   readonly platform = "x" as const;
 
-  async getAuthorizationUrl(redirectUri: string): Promise<{ authUrl: string; state: string }> {
+  async getAuthorizationUrl(redirectUri: string, extended = false): Promise<{ authUrl: string; state: string }> {
     const { clientId } = getXClientCredentials();
 
     const codeVerifier = randomBytes(32).toString("base64url");
     const codeChallenge = createHash("sha256").update(codeVerifier).digest("base64url");
     const state = randomBytes(16).toString("hex");
 
-    savePkceState(state, codeVerifier);
+    savePkceState(state, codeVerifier, extended);
+
+    // Free tier: auth + posting; Extended (Basic+): adds follows
+    const FREE_SCOPES = "tweet.read tweet.write users.read offline.access";
+    const EXTENDED_SCOPES = "tweet.read tweet.write users.read follows.read follows.write offline.access";
 
     const params = new URLSearchParams({
       response_type: "code",
       client_id: clientId,
       redirect_uri: redirectUri,
-      scope: "tweet.read users.read follows.read follows.write offline.access",
+      scope: extended ? EXTENDED_SCOPES : FREE_SCOPES,
       state,
       code_challenge: codeChallenge,
       code_challenge_method: "S256",

@@ -139,6 +139,14 @@ export async function xApiFetch<T>(
     return retryRes.json();
   }
 
+  if (res.status === 403) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new TierRestrictedError(
+      endpointPattern,
+      err.detail || "This endpoint requires a higher X API tier"
+    );
+  }
+
   if (res.status === 429) {
     const resetHeader = res.headers.get("x-rate-limit-reset");
     const retryAfter = resetHeader ? parseInt(resetHeader) - now : 60;
@@ -169,6 +177,16 @@ export class RateLimitError extends Error {
   ) {
     super(`Rate limited on ${endpoint}. Retry after ${retryAfter}s`);
     this.name = "RateLimitError";
+  }
+}
+
+export class TierRestrictedError extends Error {
+  constructor(
+    public readonly endpoint: string,
+    detail: string
+  ) {
+    super(`Endpoint ${endpoint} requires a higher X API tier. ${detail}`);
+    this.name = "TierRestrictedError";
   }
 }
 

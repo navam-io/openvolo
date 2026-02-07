@@ -1,16 +1,31 @@
 import { NextResponse } from "next/server";
 import { getPlatformAccountByPlatform } from "@/lib/db/queries/platform-accounts";
 import { disconnectXAccount } from "@/lib/platforms/x/auth";
+import { decrypt } from "@/lib/auth/crypto";
+import type { PlatformCredentials } from "@/lib/platforms/adapter";
 
 /**
  * GET /api/platforms/x
- * Check X connection status.
+ * Check X connection status including granted scopes / sync capability.
  */
 export async function GET() {
   const account = getPlatformAccountByPlatform("x");
 
   if (!account) {
     return NextResponse.json({ connected: false });
+  }
+
+  // Determine granted scopes from encrypted credentials
+  let grantedScopes = "";
+  let syncCapable = false;
+  if (account.credentialsEncrypted) {
+    try {
+      const creds: PlatformCredentials = JSON.parse(decrypt(account.credentialsEncrypted));
+      grantedScopes = creds.grantedScopes ?? "";
+      syncCapable = grantedScopes.includes("follows.read");
+    } catch {
+      // Credentials may be corrupted — don't block the status response
+    }
   }
 
   return NextResponse.json({
@@ -21,6 +36,8 @@ export async function GET() {
       status: account.status,
       lastSyncedAt: account.lastSyncedAt,
       createdAt: account.createdAt,
+      grantedScopes,
+      syncCapable,
     },
   });
 }

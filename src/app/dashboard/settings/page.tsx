@@ -25,6 +25,8 @@ interface XConnectionState {
   displayName: string | null;
   status: "active" | "paused" | "needs_reauth" | null;
   lastSyncedAt: number | null;
+  syncCapable: boolean;
+  grantedScopes: string;
 }
 
 interface SyncResultState {
@@ -56,6 +58,8 @@ function SettingsContent() {
     displayName: null,
     status: null,
     lastSyncedAt: null,
+    syncCapable: false,
+    grantedScopes: "",
   });
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -82,6 +86,8 @@ function SettingsContent() {
           displayName: data.account?.displayName ?? null,
           status: data.account?.status ?? null,
           lastSyncedAt: data.account?.lastSyncedAt ?? null,
+          syncCapable: data.account?.syncCapable ?? false,
+          grantedScopes: data.account?.grantedScopes ?? "",
         });
       })
       .catch(() => {
@@ -145,12 +151,13 @@ function SettingsContent() {
     fetchAuth();
   }
 
-  async function handleXConnect() {
+  async function handleXConnect(extended = false) {
     setConnecting(true);
     setError(null);
 
     try {
-      const res = await fetch("/api/platforms/x/auth");
+      const url = extended ? "/api/platforms/x/auth?extended=true" : "/api/platforms/x/auth";
+      const res = await fetch(url);
       const data = await res.json();
 
       if (!res.ok) {
@@ -184,6 +191,8 @@ function SettingsContent() {
         displayName: null,
         status: null,
         lastSyncedAt: null,
+        syncCapable: false,
+        grantedScopes: "",
       });
       setSyncResult(null);
     } catch {
@@ -380,9 +389,11 @@ function SettingsContent() {
               accountHandle={xState.displayName ?? undefined}
               lastSyncedAt={xState.lastSyncedAt}
               status={getXConnectionStatus()}
-              onConnect={handleXConnect}
+              syncCapable={xState.syncCapable}
+              onConnect={() => handleXConnect(false)}
               onDisconnect={handleXDisconnect}
               onSync={handleXSync}
+              onEnableSync={() => handleXConnect(true)}
               connecting={connecting}
               syncing={syncing}
               disconnecting={disconnecting}

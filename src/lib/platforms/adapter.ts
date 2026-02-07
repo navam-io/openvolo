@@ -3,6 +3,7 @@ export interface PlatformCredentials {
   accessToken: string;
   refreshToken: string;
   expiresAt: number; // unix seconds
+  grantedScopes?: string; // space-separated scopes actually granted by the platform
 }
 
 /** Normalized user profile returned from any platform. */
@@ -49,7 +50,7 @@ export interface PlatformAdapter {
   readonly platform: "x" | "linkedin" | "gmail" | "substack";
 
   /** Generate the OAuth authorization URL for initial connection. */
-  getAuthorizationUrl(redirectUri: string): Promise<{ authUrl: string; state: string }>;
+  getAuthorizationUrl(redirectUri: string, extended?: boolean): Promise<{ authUrl: string; state: string }>;
 
   /** Exchange an OAuth authorization code for access/refresh tokens. */
   exchangeCode(code: string, state: string, redirectUri: string): Promise<PlatformCredentials>;

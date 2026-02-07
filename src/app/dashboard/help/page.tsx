@@ -265,7 +265,8 @@ function XSetupTab() {
               <span className="text-primary font-medium">developer.x.com</span>
             </li>
             <li>A project and app created in the X Developer Portal</li>
-            <li>Free tier is sufficient for basic API access</li>
+            <li>Free tier: account connection + posting (500 posts/month)</li>
+            <li>Basic tier ($200/mo): also enables contact sync (importing following list)</li>
           </ul>
         </CardContent>
       </Card>
@@ -319,7 +320,7 @@ function XSetupTab() {
             </li>
             <li>
               <strong className="text-foreground">App permissions</strong>:
-              Select <Code>Read</Code>
+              Select <Code>Read and write</Code>
             </li>
             <li>
               <strong className="text-foreground">Type of App</strong>: Select{" "}
@@ -385,7 +386,7 @@ X_CLIENT_SECRET="your-oauth2-client-secret"`}</CodeBlock>
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <ol className="list-decimal pl-5 space-y-1">
+          <ol className="list-decimal pl-5 space-y-2">
             <li>
               Go to{" "}
               <Link
@@ -397,11 +398,18 @@ X_CLIENT_SECRET="your-oauth2-client-secret"`}</CodeBlock>
               &rarr; Platform Connections &rarr; Click{" "}
               <strong className="text-foreground">Connect</strong> on X/Twitter
             </li>
-            <li>Authorize the app on X</li>
+            <li>Authorize the app on X (works on all tiers, including Free)</li>
             <li>
-              After redirect, click{" "}
-              <strong className="text-foreground">Sync Now</strong> to import
-              your following list as contacts
+              <strong className="text-foreground">Free tier</strong>: You&apos;re
+              connected and can post. To import contacts, click{" "}
+              <strong className="text-foreground">Enable Contact Sync</strong>{" "}
+              (requires Basic tier)
+            </li>
+            <li>
+              <strong className="text-foreground">Basic tier</strong>: Click{" "}
+              <strong className="text-foreground">Enable Contact Sync</strong>{" "}
+              &rarr; re-authorize with extended permissions &rarr; then click{" "}
+              <strong className="text-foreground">Sync Now</strong>
             </li>
             <li>
               Contacts appear in{" "}
@@ -534,7 +542,7 @@ function FaqTab() {
     {
       icon: Twitter,
       q: "What X API plan do I need?",
-      a: "Free tier works. Rate limits: 15 requests/15min for followers/following, 900/15min for user lookups.",
+      a: "Free tier supports account connection and posting (500 posts/month). To import your following list via Contact Sync, you need the Basic tier ($200/mo) which includes follows.read access.",
     },
     {
       icon: Key,
@@ -550,7 +558,12 @@ function FaqTab() {
     {
       icon: RefreshCw,
       q: "What happens when I click Sync?",
-      a: "Fetches up to 1,000 accounts you follow, creates or updates contacts with X profile data, and computes enrichment scores.",
+      a: "Fetches up to 1,000 accounts you follow, creates or updates contacts with X profile data, and computes enrichment scores. Requires the X API Basic tier ($200/mo) for follows.read access.",
+    },
+    {
+      icon: RefreshCw,
+      q: "Why can't I sync contacts?",
+      a: "Contact sync uses the follows.read endpoint which X removed from the Free tier in August 2025. You need the X API Basic tier ($200/mo). After upgrading your X Developer plan, click \"Enable Contact Sync\" in Settings to re-authorize with the required permissions.",
     },
     {
       icon: UserPlus,

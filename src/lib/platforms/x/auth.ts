@@ -126,6 +126,7 @@ export async function refreshXTokenAsync(accountId: string): Promise<PlatformCre
     accessToken: data.access_token,
     refreshToken: data.refresh_token, // X issues a new refresh token
     expiresAt: Math.floor(Date.now() / 1000) + data.expires_in,
+    grantedScopes: data.scope ?? oldCreds.grantedScopes, // preserve scopes across refreshes
   };
 
   saveXCredentials(accountId, newCreds);
