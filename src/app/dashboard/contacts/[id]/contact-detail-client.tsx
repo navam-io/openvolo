@@ -21,9 +21,11 @@ import { ContactForm } from "@/components/contact-form";
 import { AddTaskDialog } from "@/components/add-task-dialog";
 import { FunnelStageBadge } from "@/components/funnel-stage-badge";
 import { PriorityBadge } from "@/components/priority-badge";
+import { EnrichmentScoreBadge } from "@/components/enrichment-score-badge";
+import { IdentitiesSection } from "@/components/identities-section";
 import { ArrowLeft, Trash2, Save, CheckCircle2, Circle } from "lucide-react";
 import Link from "next/link";
-import type { Contact, Task } from "@/lib/db/types";
+import type { ContactWithIdentities, Task } from "@/lib/db/types";
 
 const platformLabels: Record<string, string> = {
   x: "X / Twitter",
@@ -33,7 +35,7 @@ const platformLabels: Record<string, string> = {
 };
 
 interface ContactDetailClientProps {
-  contact: Contact;
+  contact: ContactWithIdentities;
   tasks: Task[];
 }
 
@@ -121,13 +123,16 @@ export function ContactDetailClient({ contact, tasks }: ContactDetailClientProps
         </div>
         <div className="flex items-center gap-2">
           <FunnelStageBadge stage={contact.funnelStage} />
-          <Badge variant="secondary">Score: {contact.score}</Badge>
+          <EnrichmentScoreBadge score={contact.enrichmentScore} />
         </div>
       </div>
 
       <Tabs defaultValue="details">
         <TabsList>
           <TabsTrigger value="details">Details</TabsTrigger>
+          <TabsTrigger value="identities">
+            Identities ({contact.identities.length})
+          </TabsTrigger>
           <TabsTrigger value="tasks">Tasks ({tasks.length})</TabsTrigger>
         </TabsList>
 
@@ -153,6 +158,25 @@ export function ContactDetailClient({ contact, tasks }: ContactDetailClientProps
                   <div>
                     <span className="text-muted-foreground">Phone: </span>
                     {contact.phone}
+                  </div>
+                )}
+                {contact.location && (
+                  <div>
+                    <span className="text-muted-foreground">Location: </span>
+                    {contact.location}
+                  </div>
+                )}
+                {contact.website && (
+                  <div>
+                    <span className="text-muted-foreground">Website: </span>
+                    <a
+                      href={contact.website}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {contact.website}
+                    </a>
                   </div>
                 )}
                 {contact.platform && (
@@ -230,6 +254,13 @@ export function ContactDetailClient({ contact, tasks }: ContactDetailClientProps
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="identities" className="space-y-4">
+          <IdentitiesSection
+            contactId={contact.id}
+            identities={contact.identities}
+          />
         </TabsContent>
 
         <TabsContent value="tasks" className="space-y-4">

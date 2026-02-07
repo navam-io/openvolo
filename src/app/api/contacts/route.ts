@@ -1,9 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { listContacts, createContact } from "@/lib/db/queries/contacts";
+import { createIdentity } from "@/lib/db/queries/identities";
+import { recalcEnrichment } from "@/lib/db/queries/contacts";
+
+const identitySchema = z.object({
+  platform: z.enum(["x", "linkedin", "gmail", "substack"]),
+  platformUserId: z.string().min(1),
+  platformHandle: z.string().optional(),
+  platformUrl: z.string().optional(),
+  isPrimary: z.boolean().optional(),
+});
 
 const createContactSchema = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z.string().min(1, "Name is required").optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
   headline: z.string().optional(),
   company: z.string().optional(),
   title: z.string().optional(),
@@ -14,12 +26,19 @@ const createContactSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().optional(),
   bio: z.string().optional(),
+  location: z.string().optional(),
+  website: z.string().optional(),
+  photoUrl: z.string().optional(),
   tags: z.string().optional(),
   funnelStage: z
     .enum(["prospect", "engaged", "qualified", "opportunity", "customer", "advocate"])
     .optional(),
   score: z.number().int().min(0).optional(),
-});
+  identity: identitySchema.optional(),
+}).refine(
+  (data) => data.name || data.firstName || data.lastName,
+  { message: "At least name, firstName, or lastName is required" }
+);
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -34,9 +53,33 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const data = createContactSchema.parse(body);
-    const contact = createContact(data);
-    return NextResponse.json(contact, { status: 201 });
+    const { identity, ...data } = createContactSchema.parse(body);
+
+    // Ensure name is always provided (required by DB schema)
+    const name =
+      data.name ||
+      [data.firstName, data.lastName].filter(Boolean).join(" ") ||
+      "Unknown";
+
+    const contact = createContact({ ...data, name });
+
+    // If an inline identity was provided, create it
+    if (identity) {
+      createIdentity({
+        contactId: contact.id,
+        platform: identity.platform,
+        platformUserId: identity.platformUserId,
+        platformHandle: identity.platformHandle,
+        platformUrl: identity.platformUrl,
+        isPrimary: identity.isPrimary ? 1 : 0,
+      });
+      recalcEnrichment(contact.id);
+    }
+
+    // Re-fetch to include the newly created identity
+    const { getContactById } = await import("@/lib/db/queries/contacts");
+    const result = getContactById(contact.id);
+    return NextResponse.json(result, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.errors }, { status: 400 });

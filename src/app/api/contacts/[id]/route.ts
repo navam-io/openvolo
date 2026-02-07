@@ -4,6 +4,8 @@ import { getContactById, updateContact, deleteContact } from "@/lib/db/queries/c
 
 const updateContactSchema = z.object({
   name: z.string().min(1).optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
   headline: z.string().optional(),
   company: z.string().optional(),
   title: z.string().optional(),
@@ -14,6 +16,9 @@ const updateContactSchema = z.object({
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().optional(),
   bio: z.string().optional(),
+  location: z.string().optional(),
+  website: z.string().optional(),
+  photoUrl: z.string().optional(),
   tags: z.string().optional(),
   funnelStage: z
     .enum(["prospect", "engaged", "qualified", "opportunity", "customer", "advocate"])

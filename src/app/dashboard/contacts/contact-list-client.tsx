@@ -20,21 +20,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { AddContactDialog } from "@/components/add-contact-dialog";
 import { FunnelStageBadge } from "@/components/funnel-stage-badge";
+import { EnrichmentScoreBadge } from "@/components/enrichment-score-badge";
 import { Users } from "lucide-react";
-import type { Contact } from "@/lib/db/types";
+import type { ContactWithIdentities } from "@/lib/db/types";
 
 const funnelStages = ["all", "prospect", "engaged", "qualified", "opportunity", "customer", "advocate"];
 const platformLabels: Record<string, string> = {
-  x: "X / Twitter",
-  linkedin: "LinkedIn",
-  gmail: "Gmail",
-  substack: "Substack",
+  x: "X",
+  linkedin: "LI",
+  gmail: "GM",
+  substack: "SS",
 };
 
 interface ContactListClientProps {
-  contacts: Contact[];
+  contacts: ContactWithIdentities[];
   currentSearch?: string;
   currentFunnelStage?: string;
 }
@@ -129,9 +131,9 @@ export function ContactListClient({
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Company</TableHead>
-                <TableHead>Platform</TableHead>
+                <TableHead>Identities</TableHead>
                 <TableHead>Stage</TableHead>
-                <TableHead>Score</TableHead>
+                <TableHead>Enrichment</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -153,13 +155,25 @@ export function ContactListClient({
                   <TableCell className="text-muted-foreground">
                     {contact.company ?? "—"}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {contact.platform ? (platformLabels[contact.platform] ?? contact.platform) : "—"}
+                  <TableCell>
+                    {contact.identities.length > 0 ? (
+                      <div className="flex gap-1">
+                        {contact.identities.map((identity) => (
+                          <Badge key={identity.id} variant="secondary" className="text-xs">
+                            {platformLabels[identity.platform] ?? identity.platform}
+                          </Badge>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <FunnelStageBadge stage={contact.funnelStage} />
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{contact.score}</TableCell>
+                  <TableCell>
+                    <EnrichmentScoreBadge score={contact.enrichmentScore} />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

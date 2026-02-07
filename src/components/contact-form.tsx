@@ -31,16 +31,39 @@ export function ContactForm({ defaultValues, onChange }: ContactFormProps) {
     onChange({ [field]: value });
   }
 
+  function handleNameChange(field: "firstName" | "lastName", value: string) {
+    const other =
+      field === "firstName"
+        ? defaultValues?.lastName ?? ""
+        : defaultValues?.firstName ?? "";
+    const full =
+      field === "firstName"
+        ? [value, other].filter(Boolean).join(" ")
+        : [other, value].filter(Boolean).join(" ");
+    onChange({ [field]: value, name: full });
+  }
+
   return (
     <div className="grid gap-4">
-      <div className="grid gap-2">
-        <Label htmlFor="name">Name *</Label>
-        <Input
-          id="name"
-          defaultValue={defaultValues?.name ?? ""}
-          onChange={(e) => handleChange("name", e.target.value)}
-          placeholder="Full name"
-        />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="firstName">First Name</Label>
+          <Input
+            id="firstName"
+            defaultValue={defaultValues?.firstName ?? ""}
+            onChange={(e) => handleNameChange("firstName", e.target.value)}
+            placeholder="First name"
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="lastName">Last Name</Label>
+          <Input
+            id="lastName"
+            defaultValue={defaultValues?.lastName ?? ""}
+            onChange={(e) => handleNameChange("lastName", e.target.value)}
+            placeholder="Last name"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -92,6 +115,27 @@ export function ContactForm({ defaultValues, onChange }: ContactFormProps) {
             defaultValue={defaultValues?.phone ?? ""}
             onChange={(e) => handleChange("phone", e.target.value)}
             placeholder="+1 (555) 000-0000"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-2">
+          <Label htmlFor="location">Location</Label>
+          <Input
+            id="location"
+            defaultValue={defaultValues?.location ?? ""}
+            onChange={(e) => handleChange("location", e.target.value)}
+            placeholder="City, Country"
+          />
+        </div>
+        <div className="grid gap-2">
+          <Label htmlFor="website">Website</Label>
+          <Input
+            id="website"
+            defaultValue={defaultValues?.website ?? ""}
+            onChange={(e) => handleChange("website", e.target.value)}
+            placeholder="https://..."
           />
         </div>
       </div>

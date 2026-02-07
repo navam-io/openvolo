@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, index, uniqueIndex } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 // Helper for default timestamps (unix epoch seconds)
@@ -32,9 +32,12 @@ export const platformAccounts = sqliteTable("platform_accounts", {
 export const contacts = sqliteTable("contacts", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
   headline: text("headline"),
   company: text("company"),
   title: text("title"),
+  // Deprecated: use contactIdentities table instead
   platform: text("platform", { enum: ["x", "linkedin", "gmail", "substack"] }),
   platformUserId: text("platform_user_id"),
   profileUrl: text("profile_url"),
@@ -42,6 +45,11 @@ export const contacts = sqliteTable("contacts", {
   email: text("email"),
   phone: text("phone"),
   bio: text("bio"),
+  location: text("location"),
+  website: text("website"),
+  photoUrl: text("photo_url"),
+  verifiedEmail: integer("verified_email").notNull().default(0),
+  enrichmentScore: integer("enrichment_score").notNull().default(0),
   tags: text("tags").default("[]"), // JSON array
   funnelStage: text("funnel_stage", {
     enum: ["prospect", "engaged", "qualified", "opportunity", "customer", "advocate"],
@@ -52,7 +60,33 @@ export const contacts = sqliteTable("contacts", {
   metadata: text("metadata").default("{}"), // JSON
   lastInteractionAt: integer("last_interaction_at"),
   ...timestamps,
-});
+}, (table) => [
+  index("idx_contacts_email").on(table.email),
+  index("idx_contacts_name").on(table.name),
+  index("idx_contacts_company").on(table.company),
+]);
+
+// --- Contact Identities (multi-platform golden record) ---
+
+export const contactIdentities = sqliteTable("contact_identities", {
+  id: text("id").primaryKey(),
+  contactId: text("contact_id")
+    .notNull()
+    .references(() => contacts.id, { onDelete: "cascade" }),
+  platform: text("platform", { enum: ["x", "linkedin", "gmail", "substack"] }).notNull(),
+  platformUserId: text("platform_user_id").notNull(),
+  platformHandle: text("platform_handle"),
+  platformUrl: text("platform_url"),
+  platformData: text("platform_data").default("{}"), // JSON
+  isPrimary: integer("is_primary").notNull().default(0),
+  isActive: integer("is_active").notNull().default(1),
+  lastSyncedAt: integer("last_synced_at"),
+  syncErrors: text("sync_errors"),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("idx_identity_platform_user").on(table.platform, table.platformUserId),
+  index("idx_identity_contact").on(table.contactId),
+]);
 
 // --- Campaigns ---
 
