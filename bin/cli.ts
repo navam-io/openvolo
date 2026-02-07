@@ -56,6 +56,17 @@ async function startApp(port: number) {
       env: { ...process.env, OPENVOLO_DATA_DIR: DATA_DIR },
     });
     console.log("  Database ready ✓");
+
+    // Run identity data migration (safe to call repeatedly)
+    try {
+      const { migrateContactIdentities } = await import("../src/lib/db/migrate-identities");
+      const result = migrateContactIdentities();
+      if (result.migrated > 0) {
+        console.log(`  Migrated ${result.migrated} contact identities ✓`);
+      }
+    } catch {
+      // Migration module may not be available in all contexts
+    }
   } catch (e) {
     console.log("  Database initialization skipped (will retry on first request)");
   }

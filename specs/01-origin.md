@@ -110,8 +110,9 @@ openvolo/
 │   │   ├── db/
 │   │   │   ├── schema.ts         # 12 Drizzle table definitions
 │   │   │   ├── client.ts         # DB connection + exports
+│   │   │   ├── types.ts          # Drizzle-inferred TypeScript types
 │   │   │   ├── migrations/       # Generated SQL migrations
-│   │   │   └── queries/          # (Phase 1) Query helpers
+│   │   │   └── queries/          # Contact, task, dashboard queries
 │   │   ├── auth/
 │   │   │   ├── crypto.ts         # AES-256-GCM encrypt/decrypt
 │   │   │   └── claude-auth.ts    # API key save/get/validate/clear
@@ -121,13 +122,19 @@ openvolo/
 │   │   └── ai/                   # (Phase 2) AI utilities
 │   └── components/
 │       ├── app-sidebar.tsx       # Navigation sidebar
-│       └── ui/                   # 14 shadcn/ui components
+│       ├── contact-form.tsx      # Reusable contact form
+│       ├── add-contact-dialog.tsx # Add contact dialog
+│       ├── add-task-dialog.tsx   # Add task dialog
+│       ├── funnel-stage-badge.tsx # Color-coded funnel stage badge
+│       ├── priority-badge.tsx    # Color-coded priority badge
+│       └── ui/                   # 19 shadcn/ui components
 ├── package.json
 ├── tsconfig.json
 ├── next.config.ts
 ├── drizzle.config.ts
 ├── components.json
-└── postcss.config.mjs
+├── postcss.config.mjs
+└── .npmrc                       # legacy-peer-deps=true
 ```
 
 ---
@@ -499,6 +506,32 @@ Actions: `save_key` (with `apiKey` field) and `clear_key`.
 - `save_key` validates the key against `api.anthropic.com` before saving.
 - Returns `{ success: true }` or `{ error: "..." }` with 400 status.
 
+### Implemented (Phase 1)
+
+#### `GET /api/contacts`
+
+Returns contact list. Query params: `search`, `funnelStage`, `platform`.
+
+#### `POST /api/contacts`
+
+Creates contact. Zod validation. Returns 201.
+
+#### `GET/PUT/DELETE /api/contacts/[id]`
+
+Single contact operations. Returns 404 if not found. DELETE returns 204.
+
+#### `GET /api/tasks`
+
+Returns task list. Query params: `status`, `priority`, `assignee`.
+
+#### `POST /api/tasks`
+
+Creates task. Zod validation. Returns 201.
+
+#### `GET/PUT/DELETE /api/tasks/[id]`
+
+Single task operations. Auto-sets `completedAt` on `status=done`.
+
 ### Planned Endpoint Directories
 
 | Path | Phase | Purpose |
@@ -578,9 +611,9 @@ Active state: exact match for `/dashboard`, prefix match for all others.
 
 | Route | Phase | Status | Description |
 |---|---|---|---|
-| `/dashboard` | 0 | implemented | Dashboard home — 4 stat cards (Contacts, Campaigns, Agent Runs, Content at "0"), recent activity card, 4-step onboarding checklist (add API key → connect X → import contacts → launch agent) |
-| `/dashboard/contacts` | 1 | placeholder | Contact list |
-| `/dashboard/contacts/[id]` | 1 | placeholder | Contact detail |
+| `/dashboard` | 1 | implemented | Dashboard home — real metrics from DB (contact/campaign/agent/content counts), recent contacts list, pending tasks list, 4-step onboarding checklist |
+| `/dashboard/contacts` | 1 | implemented | Contact list — search by name/company, filter by funnel stage/platform, sortable table with stage badges and scores, add contact dialog |
+| `/dashboard/contacts/[id]` | 1 | implemented | Contact detail — info display, edit form, delete with AlertDialog confirmation, tasks tab with toggle/add/delete |
 | `/dashboard/campaigns` | 2 | placeholder | Campaign list — placeholder previews multi-step AI-powered personalization sequences |
 | `/dashboard/campaigns/[id]` | 2 | placeholder | Campaign detail / builder |
 | `/dashboard/content` | 2 | placeholder | Content library — placeholder previews TipTap editor with platform-specific formatting |
@@ -603,23 +636,28 @@ Three-state auth UI:
 Platform connections section shows X/Twitter (Phase 1) and LinkedIn (Phase 4) as
 placeholder cards with phase badges.
 
-### shadcn/ui Components (14 installed) — implemented
+### shadcn/ui Components (19 installed) — implemented
 
 | Component | File |
 |---|---|
+| Alert Dialog | `src/components/ui/alert-dialog.tsx` |
 | Avatar | `src/components/ui/avatar.tsx` |
 | Badge | `src/components/ui/badge.tsx` |
 | Button | `src/components/ui/button.tsx` |
 | Card | `src/components/ui/card.tsx` |
+| Dialog | `src/components/ui/dialog.tsx` |
 | Dropdown Menu | `src/components/ui/dropdown-menu.tsx` |
 | Input | `src/components/ui/input.tsx` |
 | Label | `src/components/ui/label.tsx` |
 | Scroll Area | `src/components/ui/scroll-area.tsx` |
+| Select | `src/components/ui/select.tsx` |
 | Separator | `src/components/ui/separator.tsx` |
 | Sheet | `src/components/ui/sheet.tsx` |
 | Sidebar | `src/components/ui/sidebar.tsx` |
 | Skeleton | `src/components/ui/skeleton.tsx` |
+| Table | `src/components/ui/table.tsx` |
 | Tabs | `src/components/ui/tabs.tsx` |
+| Textarea | `src/components/ui/textarea.tsx` |
 | Tooltip | `src/components/ui/tooltip.tsx` |
 
 **shadcn config:** New York style, zinc base color, CSS variables enabled, Lucide icons,
@@ -694,6 +732,12 @@ Used by the `build:cli` script: `tsc -p tsconfig.cli.json`.
 - **baseColor:** zinc
 - **iconLibrary:** lucide
 
+### `.npmrc`
+
+Contains `legacy-peer-deps=true` to resolve the zod v3/v4 peer dependency conflict
+between `ai` SDK (requires zod ≥3.25) and `@anthropic-ai/claude-agent-sdk` (requires
+zod ≥4.0). Required for `npx shadcn` installs and general `npm install`.
+
 ### Environment Variables — implemented
 
 **File:** `.env.example` (copy to `.env.local`)
@@ -715,7 +759,7 @@ Used by the `build:cli` script: `tsc -p tsconfig.cli.json`.
 | Phase | Name | Status | Delivers |
 |---|---|---|---|
 | **0** | Foundation | complete | CLI launcher, database schema (12 tables), auth system, UI shell with sidebar and all route placeholders, settings page with three-state auth |
-| **1** | Core CRM + X/Twitter | planned | Contact CRUD with kanban views, task CRUD, dashboard metrics, X OAuth 2.0 flow, X API v2 client, platform adapter interface, rate limiter |
+| **1** | Core CRM + X/Twitter | partial | **Done:** Contact CRUD (list, detail, create, edit, delete), task CRUD (create, toggle, delete), dashboard with real DB metrics, search/filter, funnel stage badges, priority badges. Platform enum expanded to 4 channels (x, linkedin, gmail, substack) — see [`specs/02-channels.md`](./02-channels.md). **Remaining:** X OAuth 2.0 flow, X API v2 client, platform adapter interface, rate limiter |
 | **2** | Content + Campaigns | planned | Multimodal content editor (TipTap), content scheduling, campaign builder with drag-and-drop steps, funnel visualization, AI chat sidebar (Vercel AI SDK) |
 | **3** | Agents + Automation | planned | Claude Agent SDK multi-agent integration, agent run tracking with step-by-step kanban visibility, human-in-the-loop approvals, goal-driven agent planning, scheduled job runner, visual workflow builder |
 | **4** | LinkedIn + Browser | planned | LinkedIn OAuth, LinkedIn API adapter, Playwright headless browser automation for session-based scraping and actions, cross-platform contact merging |
@@ -738,13 +782,29 @@ Used by the `build:cli` script: `tsc -p tsconfig.cli.json`.
 | `src/app/api/settings/route.ts` | API key management endpoint | exists |
 | `src/lib/db/schema.ts` | 12 Drizzle table definitions | exists |
 | `src/lib/db/client.ts` | SQLite connection + Drizzle instance | exists |
+| `src/lib/db/types.ts` | Drizzle-inferred TypeScript types (Contact, Task, etc.) | exists |
+| `src/lib/db/queries/contacts.ts` | Contact query helpers (list, get, create, update, delete) | exists |
+| `src/lib/db/queries/tasks.ts` | Task query helpers (list, get, create, update, delete) | exists |
+| `src/lib/db/queries/dashboard.ts` | Dashboard metrics (counts, recent contacts, pending tasks) | exists |
 | `src/lib/db/migrations/` | Generated SQL migrations | exists |
 | `src/lib/db/migrations/0000_*.sql` | Initial migration (all 12 tables) | exists |
 | `src/lib/auth/crypto.ts` | AES-256-GCM encrypt/decrypt | exists |
 | `src/lib/auth/claude-auth.ts` | API key save/get/validate/clear | exists |
 | `src/lib/utils.ts` | `cn()` utility (clsx + tailwind-merge) | exists |
+| `src/app/api/contacts/route.ts` | GET/POST contacts endpoint | exists |
+| `src/app/api/contacts/[id]/route.ts` | GET/PUT/DELETE single contact endpoint | exists |
+| `src/app/api/tasks/route.ts` | GET/POST tasks endpoint | exists |
+| `src/app/api/tasks/[id]/route.ts` | GET/PUT/DELETE single task endpoint | exists |
+| `src/app/dashboard/contacts/page.tsx` | Contact list page (server component) | exists |
+| `src/app/dashboard/contacts/[id]/page.tsx` | Contact detail page (server component) | exists |
+| `src/app/dashboard/contacts/[id]/contact-detail-client.tsx` | Contact detail client component (edit, delete, tasks) | exists |
 | `src/components/app-sidebar.tsx` | Navigation sidebar (7 items) | exists |
-| `src/components/ui/` | 14 shadcn/ui components | exists |
+| `src/components/contact-form.tsx` | Reusable contact form (create + edit) | exists |
+| `src/components/add-contact-dialog.tsx` | Dialog for adding new contacts | exists |
+| `src/components/add-task-dialog.tsx` | Dialog for adding new tasks | exists |
+| `src/components/funnel-stage-badge.tsx` | Color-coded funnel stage badge | exists |
+| `src/components/priority-badge.tsx` | Color-coded priority badge | exists |
+| `src/components/ui/` | 19 shadcn/ui components | exists |
 | `package.json` | Dependencies, scripts, metadata | exists |
 | `tsconfig.json` | TypeScript compiler config | exists |
 | `tsconfig.cli.json` | CLI build config (ES2022, outputs to dist/) | exists |
@@ -753,6 +813,7 @@ Used by the `build:cli` script: `tsc -p tsconfig.cli.json`.
 | `drizzle.config.ts` | Drizzle ORM migration config | exists |
 | `components.json` | shadcn/ui configuration | exists |
 | `postcss.config.mjs` | PostCSS with @tailwindcss/postcss | exists |
+| `.npmrc` | `legacy-peer-deps=true` for zod v3/v4 conflict | exists |
 | `~/.openvolo/data.db` | User's SQLite database | runtime |
 | `~/.openvolo/config.json` | Encrypted credentials | runtime |
 | `~/.openvolo/sessions/` | Agent session storage | runtime |

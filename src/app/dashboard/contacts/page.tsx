@@ -1,32 +1,31 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users } from "lucide-react";
+import { listContacts } from "@/lib/db/queries/contacts";
+import { ContactListClient } from "./contact-list-client";
 
-export default function ContactsPage() {
+export default async function ContactsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ search?: string; funnelStage?: string; platform?: string }>;
+}) {
+  const params = await searchParams;
+  const contacts = listContacts({
+    search: params.search,
+    funnelStage: params.funnelStage,
+    platform: params.platform,
+  });
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Contacts</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-heading-1">Contacts</h1>
+        <p className="text-muted-foreground mt-1">
           Manage your CRM contacts across platforms.
         </p>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            No contacts yet
-          </CardTitle>
-          <CardDescription>
-            Contacts will appear here once you import them or sync from a connected platform.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Connect your X/Twitter account in Settings to start importing contacts.
-          </p>
-        </CardContent>
-      </Card>
+      <ContactListClient
+        contacts={contacts}
+        currentSearch={params.search}
+        currentFunnelStage={params.funnelStage}
+      />
     </div>
   );
 }

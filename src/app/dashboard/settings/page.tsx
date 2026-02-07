@@ -74,8 +74,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-heading-1">Settings</h1>
+        <p className="text-muted-foreground mt-1">
           Configure API keys and platform connections.
         </p>
       </div>

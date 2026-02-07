@@ -5,7 +5,7 @@ export default async function CampaignDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Campaign Detail</h1>
+      <h1 className="text-heading-1">Campaign Detail</h1>
       <Card>
         <CardHeader>
           <CardTitle>Campaign {id}</CardTitle>
