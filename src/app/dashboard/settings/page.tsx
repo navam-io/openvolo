@@ -390,6 +390,7 @@ function SettingsContent() {
               lastSyncedAt={xState.lastSyncedAt}
               status={getXConnectionStatus()}
               syncCapable={xState.syncCapable}
+              grantedScopes={xState.grantedScopes || undefined}
               onConnect={() => handleXConnect(false)}
               onDisconnect={handleXDisconnect}
               onSync={handleXSync}

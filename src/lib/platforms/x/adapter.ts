@@ -45,9 +45,9 @@ export class XPlatformAdapter implements PlatformAdapter {
 
     savePkceState(state, codeVerifier, extended);
 
-    // Free tier: auth + posting; Extended (Basic+): adds follows
-    const FREE_SCOPES = "tweet.read tweet.write users.read offline.access";
-    const EXTENDED_SCOPES = "tweet.read tweet.write users.read follows.read follows.write offline.access";
+    // Free tier: CRM engagement + messaging; Extended (Basic+): adds contact management
+    const FREE_SCOPES = "tweet.read tweet.write tweet.moderate.write users.read like.read like.write bookmark.read bookmark.write dm.read dm.write offline.access";
+    const EXTENDED_SCOPES = "tweet.read tweet.write tweet.moderate.write users.read like.read like.write bookmark.read bookmark.write dm.read dm.write follows.read follows.write list.read list.write mute.read mute.write block.read block.write space.read offline.access";
 
     const params = new URLSearchParams({
       response_type: "code",

@@ -3,10 +3,10 @@ import { randomBytes, createHash } from "crypto";
 import { getXClientCredentials } from "@/lib/platforms/x/auth";
 import { savePkceState } from "@/lib/platforms/x/pkce-store";
 
-// Free tier: auth + posting (requires "Read and write" app permissions in X Developer Portal)
-const FREE_SCOPES = "tweet.read tweet.write users.read offline.access";
-// Basic+ tier: adds contact sync (follows)
-const EXTENDED_SCOPES = "tweet.read tweet.write users.read follows.read follows.write offline.access";
+// Free tier: CRM engagement + messaging (requires "Read and write and Direct message" in X Developer Portal)
+const FREE_SCOPES = "tweet.read tweet.write tweet.moderate.write users.read like.read like.write bookmark.read bookmark.write dm.read dm.write offline.access";
+// Basic+ tier: adds contact management scopes (follows, lists, mute, block)
+const EXTENDED_SCOPES = "tweet.read tweet.write tweet.moderate.write users.read like.read like.write bookmark.read bookmark.write dm.read dm.write follows.read follows.write list.read list.write mute.read mute.write block.read block.write space.read offline.access";
 
 /**
  * GET /api/platforms/x/auth
