@@ -49,7 +49,7 @@ export function AppSidebar() {
             height={32}
             className="rounded-lg"
           />
-          <span className="text-lg font-bold text-gradient-brand font-[family-name:var(--font-display)]">
+          <span className="text-lg font-bold text-gradient-brand font-display">
             OpenVolo
           </span>
         </Link>
@@ -73,7 +73,7 @@ export function AppSidebar() {
                       asChild
                       isActive={isActive}
                       className={cn(
-                        "font-[family-name:var(--font-display)] font-medium transition-all duration-200",
+                        "font-display font-medium transition-all duration-200",
                         isActive &&
                           "border-l-2 border-primary bg-primary/8 text-primary"
                       )}
@@ -97,7 +97,7 @@ export function AppSidebar() {
               asChild
               isActive={pathname === "/dashboard/settings"}
               className={cn(
-                "font-[family-name:var(--font-display)] font-medium transition-all duration-200",
+                "font-display font-medium transition-all duration-200",
                 pathname === "/dashboard/settings" &&
                   "border-l-2 border-primary bg-primary/8 text-primary"
               )}

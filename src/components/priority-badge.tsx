@@ -10,7 +10,7 @@ const priorityColors: Record<string, string> = {
 
 export function PriorityBadge({ priority }: { priority: string }) {
   return (
-    <Badge variant="outline" className={cn("font-medium", priorityColors[priority])}>
+    <Badge variant="outline" className={cn("font-medium", priorityColors[priority] ?? "bg-muted/15 text-muted-foreground border-muted")}>
       {priority}
     </Badge>
   );

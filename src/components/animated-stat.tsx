@@ -9,34 +9,45 @@ interface AnimatedStatProps {
 
 export function AnimatedStat({ value, duration = 800 }: AnimatedStatProps) {
   const [display, setDisplay] = useState(0);
-  const ref = useRef<HTMLSpanElement>(null);
-  const hasAnimated = useRef(false);
+  const prevValue = useRef(value);
+  const displayRef = useRef(0);
 
   useEffect(() => {
-    if (hasAnimated.current) return;
-    hasAnimated.current = true;
+    // Skip if value hasn't changed (re-render without new data)
+    if (prevValue.current === value && displayRef.current === value) return;
 
-    if (value === 0) {
+    const from = displayRef.current;
+    const to = value;
+    prevValue.current = value;
+
+    if (to === 0) {
       setDisplay(0);
+      displayRef.current = 0;
       return;
     }
 
     const start = performance.now();
+
+    let rafId: number;
 
     function animate(now: number) {
       const elapsed = now - start;
       const progress = Math.min(elapsed / duration, 1);
       // ease-out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
-      setDisplay(Math.round(eased * value));
+      const current = Math.round(from + eased * (to - from));
+      setDisplay(current);
+      displayRef.current = current;
 
       if (progress < 1) {
-        requestAnimationFrame(animate);
+        rafId = requestAnimationFrame(animate);
       }
     }
 
-    requestAnimationFrame(animate);
+    rafId = requestAnimationFrame(animate);
+
+    return () => cancelAnimationFrame(rafId);
   }, [value, duration]);
 
-  return <span ref={ref}>{display}</span>;
+  return <span>{display}</span>;
 }

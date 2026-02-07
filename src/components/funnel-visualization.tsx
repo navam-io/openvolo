@@ -8,7 +8,7 @@ const stageColors: Record<string, string> = {
   qualified: "bg-chart-5",
   opportunity: "bg-chart-3",
   customer: "bg-chart-4",
-  advocate: "bg-chart-3",
+  advocate: "bg-primary",
 };
 
 const stageLabels: Record<string, string> = {
@@ -43,9 +43,9 @@ export function FunnelVisualization({ data }: FunnelVisualizationProps) {
           d.count > 0 ? (
             <div
               key={d.stage}
-              className={`${stageColors[d.stage]} transition-all duration-500`}
+              className={`${stageColors[d.stage] ?? "bg-muted"} transition-all duration-500`}
               style={{ width: `${(d.count / total) * 100}%` }}
-              title={`${stageLabels[d.stage]}: ${d.count}`}
+              title={`${stageLabels[d.stage] ?? d.stage}: ${d.count}`}
             />
           ) : null
         )}
@@ -55,8 +55,8 @@ export function FunnelVisualization({ data }: FunnelVisualizationProps) {
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         {data.map((d) => (
           <div key={d.stage} className="flex items-center gap-1.5 text-sm">
-            <div className={`h-2.5 w-2.5 rounded-full ${stageColors[d.stage]}`} />
-            <span className="text-muted-foreground">{stageLabels[d.stage]}</span>
+            <div className={`h-2.5 w-2.5 rounded-full ${stageColors[d.stage] ?? "bg-muted"}`} />
+            <span className="text-muted-foreground">{stageLabels[d.stage] ?? d.stage}</span>
             <span className="font-medium">{d.count}</span>
           </div>
         ))}
