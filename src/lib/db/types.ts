@@ -1,5 +1,5 @@
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
-import { contacts, contactIdentities, tasks, campaigns, contentItems, agentRuns, engagements } from "./schema";
+import { contacts, contactIdentities, tasks, campaigns, contentItems, agentRuns, engagements, platformAccounts } from "./schema";
 
 // Contact types
 export type Contact = InferSelectModel<typeof contacts>;
@@ -13,6 +13,10 @@ export type ContactWithIdentities = Contact & { identities: ContactIdentity[] };
 // Task types
 export type Task = InferSelectModel<typeof tasks>;
 export type NewTask = InferInsertModel<typeof tasks>;
+
+// Platform account types
+export type PlatformAccount = InferSelectModel<typeof platformAccounts>;
+export type NewPlatformAccount = InferInsertModel<typeof platformAccounts>;
 
 // Other entity types (used by dashboard)
 export type Campaign = InferSelectModel<typeof campaigns>;
