@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getApiKey, saveApiKey, validateApiKey, getAuthMethod, clearApiKey } from "@/lib/auth/claude-auth";
+import { saveApiKey, validateApiKey, getAuthSource, clearApiKey } from "@/lib/auth/claude-auth";
 
 export async function GET() {
-  const method = getAuthMethod();
-  const hasKey = !!getApiKey();
-  return NextResponse.json({ method, hasKey });
+  const { method, keyPrefix } = getAuthSource();
+
+  let source: "env_var" | "config" | "none";
+  if (method === "env_var") source = "env_var";
+  else if (method === "api_key") source = "config";
+  else source = "none";
+
+  return NextResponse.json({ source, keyPrefix, hasKey: method !== "none" });
 }
 
 export async function POST(req: NextRequest) {

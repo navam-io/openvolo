@@ -7,21 +7,33 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Key, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Key, CheckCircle, XCircle, Loader2, Monitor } from "lucide-react";
+
+type AuthSource = "env_var" | "config" | "none";
+
+interface AuthState {
+  status: "loading" | "ready";
+  source: AuthSource;
+  keyPrefix: string | null;
+}
 
 export default function SettingsPage() {
   const [apiKey, setApiKey] = useState("");
-  const [authStatus, setAuthStatus] = useState<"loading" | "connected" | "none">("loading");
+  const [auth, setAuth] = useState<AuthState>({ status: "loading", source: "none", keyPrefix: null });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  function fetchAuth() {
     fetch("/api/settings")
       .then((r) => r.json())
       .then((data) => {
-        setAuthStatus(data.hasKey ? "connected" : "none");
+        setAuth({ status: "ready", source: data.source ?? "none", keyPrefix: data.keyPrefix ?? null });
       })
-      .catch(() => setAuthStatus("none"));
+      .catch(() => setAuth({ status: "ready", source: "none", keyPrefix: null }));
+  }
+
+  useEffect(() => {
+    fetchAuth();
   }, []);
 
   async function handleSave() {
@@ -40,8 +52,8 @@ export default function SettingsPage() {
       if (!res.ok) {
         setError(data.error);
       } else {
-        setAuthStatus("connected");
         setApiKey("");
+        fetchAuth();
       }
     } catch {
       setError("Failed to save API key");
@@ -56,7 +68,7 @@ export default function SettingsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "clear_key" }),
     });
-    setAuthStatus("none");
+    fetchAuth();
   }
 
   return (
@@ -89,12 +101,17 @@ export default function SettingsPage() {
                 </a>
               </CardDescription>
             </div>
-            {authStatus === "loading" ? (
+            {auth.status === "loading" ? (
               <Badge variant="outline">
                 <Loader2 className="mr-1 h-3 w-3 animate-spin" />
                 Checking
               </Badge>
-            ) : authStatus === "connected" ? (
+            ) : auth.source === "env_var" ? (
+              <Badge variant="default" className="bg-green-600">
+                <Monitor className="mr-1 h-3 w-3" />
+                Environment Variable
+              </Badge>
+            ) : auth.source === "config" ? (
               <Badge variant="default" className="bg-green-600">
                 <CheckCircle className="mr-1 h-3 w-3" />
                 Connected
@@ -108,16 +125,42 @@ export default function SettingsPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          {authStatus === "connected" ? (
-            <div className="flex items-center justify-between">
+          {auth.status === "loading" ? null : auth.source === "env_var" ? (
+            /* State A: Env var detected */
+            <div className="space-y-3">
               <p className="text-sm text-muted-foreground">
-                API key is saved and encrypted on this machine.
+                API key detected from environment variable <code className="rounded bg-muted px-1 py-0.5 text-xs">ANTHROPIC_API_KEY</code>
               </p>
-              <Button variant="destructive" size="sm" onClick={handleClear}>
-                Remove Key
-              </Button>
+              {auth.keyPrefix && (
+                <p className="font-mono text-sm text-muted-foreground">
+                  {auth.keyPrefix}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                To change this key, update your <code className="rounded bg-muted px-1 py-0.5 text-xs">.env.local</code> file and restart the server.
+              </p>
+            </div>
+          ) : auth.source === "config" ? (
+            /* State B: Saved key in config */
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">
+                    API key saved and encrypted on this machine.
+                  </p>
+                  {auth.keyPrefix && (
+                    <p className="font-mono text-sm text-muted-foreground">
+                      {auth.keyPrefix}
+                    </p>
+                  )}
+                </div>
+                <Button variant="destructive" size="sm" onClick={handleClear}>
+                  Remove Key
+                </Button>
+              </div>
             </div>
           ) : (
+            /* State C: No key configured */
             <>
               <div className="space-y-2">
                 <Label htmlFor="api-key">API Key</Label>
@@ -137,6 +180,9 @@ export default function SettingsPage() {
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save & Validate
               </Button>
+              <p className="text-xs text-muted-foreground">
+                Or set <code className="rounded bg-muted px-1 py-0.5 text-xs">ANTHROPIC_API_KEY</code> in <code className="rounded bg-muted px-1 py-0.5 text-xs">.env.local</code> and restart the server.
+              </p>
             </>
           )}
         </CardContent>
