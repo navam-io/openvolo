@@ -3,7 +3,7 @@ import { randomBytes, createHash } from "crypto";
 import { getXClientCredentials } from "@/lib/platforms/x/auth";
 import { savePkceState } from "@/lib/platforms/x/pkce-store";
 
-// Free tier: auth + posting (works on all tiers)
+// Free tier: auth + posting (requires "Read and write" app permissions in X Developer Portal)
 const FREE_SCOPES = "tweet.read tweet.write users.read offline.access";
 // Basic+ tier: adds contact sync (follows)
 const EXTENDED_SCOPES = "tweet.read tweet.write users.read follows.read follows.write offline.access";
