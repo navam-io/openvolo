@@ -1,34 +1,41 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Megaphone, Bot, FileText } from "lucide-react";
-
-const stats = [
-  {
-    title: "Contacts",
-    value: "0",
-    description: "Total contacts in CRM",
-    icon: Users,
-  },
-  {
-    title: "Campaigns",
-    value: "0",
-    description: "Active campaigns",
-    icon: Megaphone,
-  },
-  {
-    title: "Agent Runs",
-    value: "0",
-    description: "Completed today",
-    icon: Bot,
-  },
-  {
-    title: "Content",
-    value: "0",
-    description: "Items in library",
-    icon: FileText,
-  },
-];
+import { Badge } from "@/components/ui/badge";
+import { Users, Megaphone, CheckSquare, FileText } from "lucide-react";
+import { getDashboardMetrics } from "@/lib/db/queries/dashboard";
+import { FunnelStageBadge } from "@/components/funnel-stage-badge";
+import { PriorityBadge } from "@/components/priority-badge";
+import Link from "next/link";
 
 export default function DashboardPage() {
+  const metrics = getDashboardMetrics();
+
+  const stats = [
+    {
+      title: "Contacts",
+      value: metrics.totalContacts.toString(),
+      description: "Total contacts in CRM",
+      icon: Users,
+    },
+    {
+      title: "Campaigns",
+      value: metrics.activeCampaigns.toString(),
+      description: "Active campaigns",
+      icon: Megaphone,
+    },
+    {
+      title: "Pending Tasks",
+      value: metrics.pendingTasks.toString(),
+      description: "Tasks needing attention",
+      icon: CheckSquare,
+    },
+    {
+      title: "Content",
+      value: metrics.contentItems.toString(),
+      description: "Items in library",
+      icon: FileText,
+    },
+  ];
+
   return (
     <div className="space-y-6">
       <div>
@@ -56,34 +63,68 @@ export default function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>Latest agent runs and engagements</CardDescription>
+            <CardTitle>Recent Contacts</CardTitle>
+            <CardDescription>Latest contacts added to your CRM</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground">
-              No activity yet. Connect a platform and run your first agent to get started.
-            </p>
+            {metrics.recentContacts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No contacts yet. Add your first contact to get started.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {metrics.recentContacts.map((contact) => (
+                  <Link
+                    key={contact.id}
+                    href={`/dashboard/contacts/${contact.id}`}
+                    className="flex items-center justify-between rounded-md p-2 hover:bg-muted transition-colors"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{contact.name}</p>
+                      {contact.company && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {contact.company}
+                        </p>
+                      )}
+                    </div>
+                    <FunnelStageBadge stage={contact.funnelStage} />
+                  </Link>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-            <CardDescription>Get started with OpenVolo</CardDescription>
+            <CardTitle>Pending Tasks</CardTitle>
+            <CardDescription>Tasks needing your attention</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <p className="text-sm text-muted-foreground">
-              1. Go to Settings and add your Anthropic API key
-            </p>
-            <p className="text-sm text-muted-foreground">
-              2. Connect your X/Twitter account
-            </p>
-            <p className="text-sm text-muted-foreground">
-              3. Import or create your first contacts
-            </p>
-            <p className="text-sm text-muted-foreground">
-              4. Launch an AI agent to research and engage
-            </p>
+          <CardContent>
+            {metrics.pendingTasksList.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No pending tasks. All caught up!
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {metrics.pendingTasksList.map((task) => (
+                  <div
+                    key={task.id}
+                    className="flex items-center justify-between rounded-md p-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{task.title}</p>
+                      {task.description && (
+                        <p className="text-xs text-muted-foreground truncate">
+                          {task.description}
+                        </p>
+                      )}
+                    </div>
+                    <PriorityBadge priority={task.priority} />
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -1,21 +1,21 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { notFound } from "next/navigation";
+import { getContactById } from "@/lib/db/queries/contacts";
+import { getTasksByContact } from "@/lib/db/queries/tasks";
+import { ContactDetailClient } from "./contact-detail-client";
 
-export default async function ContactDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ContactDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
+  const contact = getContactById(id);
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Contact Detail</h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Contact {id}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Contact details will be implemented in Phase 1.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  if (!contact) {
+    notFound();
+  }
+
+  const tasks = getTasksByContact(id);
+
+  return <ContactDetailClient contact={contact} tasks={tasks} />;
 }
