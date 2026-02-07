@@ -8,6 +8,7 @@ import {
   Bot,
   GitBranch,
   Settings,
+  HelpCircle,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -105,6 +106,22 @@ export function AppSidebar() {
               <Link href="/dashboard/settings">
                 <Settings className="h-4 w-4" />
                 <span>Settings</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={pathname === "/dashboard/help"}
+              className={cn(
+                "font-display font-medium transition-all duration-200",
+                pathname === "/dashboard/help" &&
+                  "border-l-2 border-primary bg-primary/8 text-primary"
+              )}
+            >
+              <Link href="/dashboard/help">
+                <HelpCircle className="h-4 w-4" />
+                <span>Help</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
