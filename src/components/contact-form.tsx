@@ -145,7 +145,9 @@ export function ContactForm({ defaultValues, onChange }: ContactFormProps) {
         <Input
           id="tags"
           defaultValue={
-            defaultValues?.tags ? JSON.parse(defaultValues.tags).join(", ") : ""
+            defaultValues?.tags
+              ? (() => { try { return JSON.parse(defaultValues.tags).join(", "); } catch { return ""; } })()
+              : ""
           }
           onChange={(e) =>
             handleChange(

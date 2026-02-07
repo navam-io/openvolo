@@ -6,6 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { ContactForm } from "@/components/contact-form";
 import { AddTaskDialog } from "@/components/add-task-dialog";
 import { FunnelStageBadge } from "@/components/funnel-stage-badge";
@@ -46,7 +57,6 @@ export function ContactDetailClient({ contact, tasks }: ContactDetailClientProps
   }
 
   async function handleDelete() {
-    if (!confirm("Are you sure you want to delete this contact?")) return;
     setDeleting(true);
     try {
       const res = await fetch(`/api/contacts/${contact.id}`, { method: "DELETE" });
@@ -74,7 +84,10 @@ export function ContactDetailClient({ contact, tasks }: ContactDetailClientProps
     router.refresh();
   }
 
-  const tags: string[] = contact.tags ? JSON.parse(contact.tags) : [];
+  let tags: string[] = [];
+  if (contact.tags) {
+    try { tags = JSON.parse(contact.tags); } catch { /* malformed JSON, ignore */ }
+  }
 
   return (
     <div className="space-y-6">
@@ -180,14 +193,29 @@ export function ContactDetailClient({ contact, tasks }: ContactDetailClientProps
                 }}
               />
               <div className="flex justify-between">
-                <Button
-                  variant="destructive"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  {deleting ? "Deleting..." : "Delete Contact"}
-                </Button>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" disabled={deleting}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      {deleting ? "Deleting..." : "Delete Contact"}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Delete contact?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This will permanently delete {contact.name} and all associated
+                        tasks. This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDelete}>
+                        Delete
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
                 <Button onClick={handleSave} disabled={saving}>
                   <Save className="mr-2 h-4 w-4" />
                   {saving ? "Saving..." : "Save Changes"}
