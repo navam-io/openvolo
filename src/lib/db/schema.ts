@@ -15,7 +15,7 @@ const timestamps = {
 
 export const platformAccounts = sqliteTable("platform_accounts", {
   id: text("id").primaryKey(),
-  platform: text("platform", { enum: ["x", "linkedin"] }).notNull(),
+  platform: text("platform", { enum: ["x", "linkedin", "gmail", "substack"] }).notNull(),
   displayName: text("display_name").notNull(),
   authType: text("auth_type", { enum: ["oauth", "session", "api_key"] }).notNull(),
   credentialsEncrypted: text("credentials_encrypted"), // JSON string, AES-256
@@ -35,7 +35,7 @@ export const contacts = sqliteTable("contacts", {
   headline: text("headline"),
   company: text("company"),
   title: text("title"),
-  platform: text("platform", { enum: ["x", "linkedin"] }),
+  platform: text("platform", { enum: ["x", "linkedin", "gmail", "substack"] }),
   platformUserId: text("platform_user_id"),
   profileUrl: text("profile_url"),
   avatarUrl: text("avatar_url"),
@@ -60,7 +60,7 @@ export const campaigns = sqliteTable("campaigns", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
-  platform: text("platform", { enum: ["x", "linkedin"] }),
+  platform: text("platform", { enum: ["x", "linkedin", "gmail", "substack"] }),
   campaignType: text("campaign_type", {
     enum: ["outreach", "engagement", "content", "nurture"],
   }).notNull(),

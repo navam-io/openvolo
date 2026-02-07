@@ -13,7 +13,13 @@ import {
 import type { Contact } from "@/lib/db/types";
 
 const funnelStages = ["prospect", "engaged", "qualified", "opportunity", "customer", "advocate"];
-const platforms = ["x", "linkedin"];
+const platforms = ["x", "linkedin", "gmail", "substack"];
+const platformLabels: Record<string, string> = {
+  x: "X / Twitter",
+  linkedin: "LinkedIn",
+  gmail: "Gmail",
+  substack: "Substack",
+};
 
 interface ContactFormProps {
   defaultValues?: Partial<Contact>;
@@ -121,7 +127,7 @@ export function ContactForm({ defaultValues, onChange }: ContactFormProps) {
             <SelectContent>
               {platforms.map((p) => (
                 <SelectItem key={p} value={p}>
-                  {p === "x" ? "X / Twitter" : "LinkedIn"}
+                  {platformLabels[p] ?? p}
                 </SelectItem>
               ))}
             </SelectContent>

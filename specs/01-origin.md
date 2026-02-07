@@ -759,7 +759,7 @@ zod ≥4.0). Required for `npx shadcn` installs and general `npm install`.
 | Phase | Name | Status | Delivers |
 |---|---|---|---|
 | **0** | Foundation | complete | CLI launcher, database schema (12 tables), auth system, UI shell with sidebar and all route placeholders, settings page with three-state auth |
-| **1** | Core CRM + X/Twitter | partial | **Done:** Contact CRUD (list, detail, create, edit, delete), task CRUD (create, toggle, delete), dashboard with real DB metrics, search/filter, funnel stage badges, priority badges. **Remaining:** X OAuth 2.0 flow, X API v2 client, platform adapter interface, rate limiter |
+| **1** | Core CRM + X/Twitter | partial | **Done:** Contact CRUD (list, detail, create, edit, delete), task CRUD (create, toggle, delete), dashboard with real DB metrics, search/filter, funnel stage badges, priority badges. Platform enum expanded to 4 channels (x, linkedin, gmail, substack) — see [`specs/02-channels.md`](./02-channels.md). **Remaining:** X OAuth 2.0 flow, X API v2 client, platform adapter interface, rate limiter |
 | **2** | Content + Campaigns | planned | Multimodal content editor (TipTap), content scheduling, campaign builder with drag-and-drop steps, funnel visualization, AI chat sidebar (Vercel AI SDK) |
 | **3** | Agents + Automation | planned | Claude Agent SDK multi-agent integration, agent run tracking with step-by-step kanban visibility, human-in-the-loop approvals, goal-driven agent planning, scheduled job runner, visual workflow builder |
 | **4** | LinkedIn + Browser | planned | LinkedIn OAuth, LinkedIn API adapter, Playwright headless browser automation for session-based scraping and actions, cross-platform contact merging |

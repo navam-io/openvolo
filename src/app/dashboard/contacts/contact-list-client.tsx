@@ -26,6 +26,12 @@ import { Users } from "lucide-react";
 import type { Contact } from "@/lib/db/types";
 
 const funnelStages = ["all", "prospect", "engaged", "qualified", "opportunity", "customer", "advocate"];
+const platformLabels: Record<string, string> = {
+  x: "X / Twitter",
+  linkedin: "LinkedIn",
+  gmail: "Gmail",
+  substack: "Substack",
+};
 
 interface ContactListClientProps {
   contacts: Contact[];
@@ -148,11 +154,7 @@ export function ContactListClient({
                     {contact.company ?? "—"}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {contact.platform === "x"
-                      ? "X / Twitter"
-                      : contact.platform === "linkedin"
-                      ? "LinkedIn"
-                      : "—"}
+                    {contact.platform ? (platformLabels[contact.platform] ?? contact.platform) : "—"}
                   </TableCell>
                   <TableCell>
                     <FunnelStageBadge stage={contact.funnelStage} />

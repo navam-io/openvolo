@@ -25,6 +25,13 @@ import { ArrowLeft, Trash2, Save, CheckCircle2, Circle } from "lucide-react";
 import Link from "next/link";
 import type { Contact, Task } from "@/lib/db/types";
 
+const platformLabels: Record<string, string> = {
+  x: "X / Twitter",
+  linkedin: "LinkedIn",
+  gmail: "Gmail",
+  substack: "Substack",
+};
+
 interface ContactDetailClientProps {
   contact: Contact;
   tasks: Task[];
@@ -151,7 +158,7 @@ export function ContactDetailClient({ contact, tasks }: ContactDetailClientProps
                 {contact.platform && (
                   <div>
                     <span className="text-muted-foreground">Platform: </span>
-                    {contact.platform === "x" ? "X / Twitter" : "LinkedIn"}
+                    {platformLabels[contact.platform] ?? contact.platform}
                   </div>
                 )}
                 {contact.profileUrl && (
