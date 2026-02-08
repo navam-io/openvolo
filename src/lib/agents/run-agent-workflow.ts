@@ -51,7 +51,7 @@ function buildSystemPrompt(
   return `${base}
 
 ## Tools Available
-- **search_web**: Search the internet for information using Brave Search
+- **search_web**: Search the internet (auto-routes between Brave and Tavily for optimal results)
 - **fetch_url**: Fetch and extract content from a web page URL
 - **scrape_url**: Use a headless browser to scrape JS-rendered pages
 - **enrich_contact**: Update an existing contact with new data (fill gaps only)
@@ -195,7 +195,7 @@ export async function runAgentWorkflow(
             count: z.number().optional().describe("Number of results (default 10)"),
           }),
           execute: async ({ query, count }) => {
-            return searchWeb(query, runId, { count });
+            return searchWeb(query, runId, { count, workflowType: config.workflowType });
           },
         }),
 
@@ -462,7 +462,7 @@ async function executeAgentLoop(
             count: z.number().optional().describe("Number of results (default 10)"),
           }),
           execute: async ({ query, count }) => {
-            return searchWeb(query, runId, { count });
+            return searchWeb(query, runId, { count, workflowType: config.workflowType });
           },
         }),
 

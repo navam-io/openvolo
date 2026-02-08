@@ -1,5 +1,8 @@
 import type { WorkflowType } from "@/lib/workflows/types";
 
+/** Search provider for web search routing. */
+export type SearchProvider = "brave" | "tavily";
+
 /** Configuration for an agent workflow run. */
 export interface AgentRunConfig {
   templateId?: string;
@@ -42,6 +45,9 @@ export interface WebSearchResult {
   query: string;
   results: SearchResult[];
   totalResults: number;
+  provider?: SearchProvider;
+  /** AI-generated summary (Tavily only). */
+  answer?: string;
 }
 
 /** Result of enriching a contact. */

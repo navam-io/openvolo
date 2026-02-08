@@ -141,7 +141,7 @@ function SettingsContent() {
     lastEnrichedAt: number | null;
   } | null>(null);
 
-  // Search API state
+  // Search API state — Brave
   const [searchApiKey, setSearchApiKey] = useState("");
   const [searchApi, setSearchApi] = useState<{
     loading: boolean;
@@ -151,19 +151,48 @@ function SettingsContent() {
   }>({ loading: true, configured: false, source: "none", keyPrefix: null });
   const [searchApiSaving, setSearchApiSaving] = useState(false);
 
+  // Search API state — Tavily
+  const [tavilyApiKey, setTavilyApiKey] = useState("");
+  const [tavilyApi, setTavilyApi] = useState<{
+    loading: boolean;
+    configured: boolean;
+    source: string;
+    keyPrefix: string | null;
+  }>({ loading: true, configured: false, source: "none", keyPrefix: null });
+  const [tavilyApiSaving, setTavilyApiSaving] = useState(false);
+
   function fetchSearchApiStatus() {
     fetch("/api/settings/search-api")
       .then((r) => r.json())
       .then((data) => {
-        setSearchApi({
-          loading: false,
-          configured: data.configured,
-          source: data.source ?? "none",
-          keyPrefix: data.keyPrefix ?? null,
-        });
+        // Handle new nested response shape (with brave/tavily sub-objects)
+        if (data.brave) {
+          setSearchApi({
+            loading: false,
+            configured: data.brave.configured,
+            source: data.brave.source ?? "none",
+            keyPrefix: data.brave.keyPrefix ?? null,
+          });
+          setTavilyApi({
+            loading: false,
+            configured: data.tavily?.configured ?? false,
+            source: data.tavily?.source ?? "none",
+            keyPrefix: data.tavily?.keyPrefix ?? null,
+          });
+        } else {
+          // Backward compat: old flat shape
+          setSearchApi({
+            loading: false,
+            configured: data.configured,
+            source: data.source ?? "none",
+            keyPrefix: data.keyPrefix ?? null,
+          });
+          setTavilyApi((prev) => ({ ...prev, loading: false }));
+        }
       })
       .catch(() => {
         setSearchApi((prev) => ({ ...prev, loading: false }));
+        setTavilyApi((prev) => ({ ...prev, loading: false }));
       });
   }
 
@@ -176,7 +205,7 @@ function SettingsContent() {
       const res = await fetch("/api/settings/search-api", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "save_key", apiKey: searchApiKey.trim() }),
+        body: JSON.stringify({ action: "save_key", apiKey: searchApiKey.trim(), provider: "brave" }),
       });
 
       const data = await res.json();
@@ -187,7 +216,7 @@ function SettingsContent() {
         fetchSearchApiStatus();
       }
     } catch {
-      setError("Failed to save Search API key");
+      setError("Failed to save Brave Search API key");
     } finally {
       setSearchApiSaving(false);
     }
@@ -197,7 +226,42 @@ function SettingsContent() {
     await fetch("/api/settings/search-api", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "clear_key" }),
+      body: JSON.stringify({ action: "clear_key", provider: "brave" }),
+    });
+    fetchSearchApiStatus();
+  }
+
+  async function handleTavilyApiSave() {
+    if (!tavilyApiKey.trim()) return;
+    setTavilyApiSaving(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/settings/search-api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save_key", apiKey: tavilyApiKey.trim(), provider: "tavily" }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error);
+      } else {
+        setTavilyApiKey("");
+        fetchSearchApiStatus();
+      }
+    } catch {
+      setError("Failed to save Tavily API key");
+    } finally {
+      setTavilyApiSaving(false);
+    }
+  }
+
+  async function handleTavilyApiClear() {
+    await fetch("/api/settings/search-api", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "clear_key", provider: "tavily" }),
     });
     fetchSearchApiStatus();
   }
@@ -940,10 +1004,10 @@ function SettingsContent() {
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2">
                 <Search className="h-5 w-5" />
-                Search API Key
+                Brave Search API Key
               </CardTitle>
               <CardDescription>
-                Required for AI agent web search. Get a free key at{" "}
+                Used for broad discovery queries (prospecting, trending topics). Get a free key at{" "}
                 <a
                   href="https://brave.com/search/api/"
                   target="_blank"
@@ -1018,6 +1082,97 @@ function SettingsContent() {
               </Button>
               <p className="text-xs text-muted-foreground">
                 Or set <code className="rounded bg-muted px-1 py-0.5 text-xs">BRAVE_SEARCH_API_KEY</code> in <code className="rounded bg-muted px-1 py-0.5 text-xs">.env.local</code> and restart.
+              </p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tavily Search API Key */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2">
+                <Search className="h-5 w-5" />
+                Tavily Search API Key
+              </CardTitle>
+              <CardDescription>
+                Used for deep research queries (enrichment, person lookup). Get a free key at{" "}
+                <a
+                  href="https://tavily.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  tavily.com
+                </a>
+                {" "}(1,000 free searches/month).
+              </CardDescription>
+            </div>
+            {tavilyApi.loading ? (
+              <Badge variant="outline">
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                Checking
+              </Badge>
+            ) : tavilyApi.configured ? (
+              <Badge variant="default" className="bg-green-600">
+                <CheckCircle className="mr-1 h-3 w-3" />
+                {tavilyApi.source === "env_var" ? "Environment Variable" : "Connected"}
+              </Badge>
+            ) : (
+              <Badge variant="secondary">
+                <XCircle className="mr-1 h-3 w-3" />
+                Not configured
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {tavilyApi.loading ? null : tavilyApi.configured ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">
+                    {tavilyApi.source === "env_var"
+                      ? "Key detected from environment variable."
+                      : "API key saved and encrypted."}
+                  </p>
+                  {tavilyApi.keyPrefix && (
+                    <p className="font-mono text-sm text-muted-foreground">
+                      {tavilyApi.keyPrefix}
+                    </p>
+                  )}
+                </div>
+                {tavilyApi.source !== "env_var" && (
+                  <Button variant="destructive" size="sm" onClick={handleTavilyApiClear}>
+                    Remove Key
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="tavily-api-key">Tavily API Key</Label>
+                <Input
+                  id="tavily-api-key"
+                  type="password"
+                  placeholder="tvly-..."
+                  value={tavilyApiKey}
+                  onChange={(e) => setTavilyApiKey(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleTavilyApiSave()}
+                />
+              </div>
+              <Button
+                onClick={handleTavilyApiSave}
+                disabled={tavilyApiSaving || !tavilyApiKey.trim()}
+              >
+                {tavilyApiSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save & Validate
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Or set <code className="rounded bg-muted px-1 py-0.5 text-xs">TAVILY_API_KEY</code> in <code className="rounded bg-muted px-1 py-0.5 text-xs">.env.local</code> and restart.
               </p>
             </>
           )}
