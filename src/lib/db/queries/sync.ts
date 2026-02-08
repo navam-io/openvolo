@@ -4,7 +4,7 @@ import { db } from "@/lib/db/client";
 import { syncCursors } from "@/lib/db/schema";
 import type { SyncCursor, NewSyncCursor } from "@/lib/db/types";
 
-type DataType = "tweets" | "mentions" | "followers" | "following" | "dms" | "likes" | "connections" | "google_contacts" | "gmail_metadata";
+type DataType = "tweets" | "mentions" | "followers" | "following" | "dms" | "likes" | "connections" | "google_contacts" | "gmail_metadata" | "x_profiles";
 
 /** Get or create a sync cursor for a specific (platformAccountId, dataType). */
 export function getSyncCursor(

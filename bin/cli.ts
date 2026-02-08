@@ -77,6 +77,16 @@ async function startApp(port: number) {
     console.log(`\n  Port ${port} in use, using ${actualPort}`);
   }
 
+  // Check if Playwright Chromium browser is installed (needed for browser enrichment)
+  try {
+    const pwBrowsersPath = join(homedir(), ".cache", "ms-playwright");
+    if (!existsSync(pwBrowsersPath)) {
+      console.log("\n  Playwright browsers not found. Run `npx playwright install chromium` for browser enrichment.");
+    }
+  } catch {
+    // Non-critical — skip silently
+  }
+
   console.log(`\n  Starting server on http://localhost:${actualPort}...\n`);
 
   // Start Next.js dev server

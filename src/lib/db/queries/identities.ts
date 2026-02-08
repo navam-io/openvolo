@@ -22,6 +22,21 @@ export function createIdentity(data: Omit<NewContactIdentity, "id">): ContactIde
   return getIdentityById(id)!;
 }
 
+export function updateIdentity(
+  id: string,
+  data: Partial<Omit<NewContactIdentity, "id">>
+): ContactIdentity | undefined {
+  const existing = getIdentityById(id);
+  if (!existing) return undefined;
+
+  db.update(contactIdentities)
+    .set({ ...data, updatedAt: Math.floor(Date.now() / 1000) })
+    .where(eq(contactIdentities.id, id))
+    .run();
+
+  return getIdentityById(id);
+}
+
 export function deleteIdentityForContact(contactId: string, identityId: string): boolean {
   const existing = db
     .select()

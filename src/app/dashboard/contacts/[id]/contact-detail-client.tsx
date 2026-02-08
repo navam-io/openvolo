@@ -23,6 +23,7 @@ import { FunnelStageBadge } from "@/components/funnel-stage-badge";
 import { PriorityBadge } from "@/components/priority-badge";
 import { EnrichmentScoreBadge } from "@/components/enrichment-score-badge";
 import { IdentitiesSection } from "@/components/identities-section";
+import { EnrichButton } from "@/components/enrich-button";
 import { ArrowLeft, Trash2, Save, CheckCircle2, Circle } from "lucide-react";
 import Link from "next/link";
 import type { ContactWithIdentities, Task } from "@/lib/db/types";
@@ -122,6 +123,12 @@ export function ContactDetailClient({ contact, tasks }: ContactDetailClientProps
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {contact.identities.some((i) => i.platform === "x") && (
+            <EnrichButton
+              contactId={contact.id}
+              onComplete={() => router.refresh()}
+            />
+          )}
           <FunnelStageBadge stage={contact.funnelStage} />
           <EnrichmentScoreBadge score={contact.enrichmentScore} />
         </div>

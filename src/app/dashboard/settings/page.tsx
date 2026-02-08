@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Key, CheckCircle, XCircle, Loader2, Monitor, Download, Upload } from "lucide-react";
+import { Key, CheckCircle, XCircle, Loader2, Monitor, Download, Upload, Globe, Sparkles, Trash2 } from "lucide-react";
 import { PlatformConnectionCard } from "@/components/platform-connection-card";
 
 type AuthSource = "env_var" | "config" | "none";
@@ -124,6 +124,23 @@ function SettingsContent() {
   const [gmMetaSyncing, setGmMetaSyncing] = useState(false);
   const [gmMetaSyncResult, setGmMetaSyncResult] = useState<SyncResultState | null>(null);
 
+  // Browser session state
+  const [browserSession, setBrowserSession] = useState<{
+    loading: boolean;
+    hasSession: boolean;
+    lastValidatedAt: number | null;
+    createdAt: number | null;
+  }>({ loading: true, hasSession: false, lastValidatedAt: null, createdAt: null });
+  const [browserSettingUp, setBrowserSettingUp] = useState(false);
+  const [browserValidating, setBrowserValidating] = useState(false);
+  const [browserClearing, setBrowserClearing] = useState(false);
+  const [browserEnriching, setBrowserEnriching] = useState(false);
+  const [enrichResult, setEnrichResult] = useState<SyncResultState | null>(null);
+  const [enrichStatus, setEnrichStatus] = useState<{
+    totalEnriched: number;
+    lastEnrichedAt: number | null;
+  } | null>(null);
+
   function fetchAuth() {
     fetch("/api/settings")
       .then((r) => r.json())
@@ -199,12 +216,131 @@ function SettingsContent() {
       });
   }
 
+  function fetchBrowserSession() {
+    fetch("/api/platforms/x/browser-session")
+      .then((r) => r.json())
+      .then((data) => {
+        setBrowserSession({
+          loading: false,
+          hasSession: data.hasSession,
+          lastValidatedAt: data.lastValidatedAt ?? null,
+          createdAt: data.createdAt ?? null,
+        });
+      })
+      .catch(() => {
+        setBrowserSession((prev) => ({ ...prev, loading: false }));
+      });
+  }
+
+  function fetchEnrichStatus() {
+    fetch("/api/platforms/x/enrich")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.enrichment) {
+          setEnrichStatus({
+            totalEnriched: data.enrichment.totalEnriched ?? 0,
+            lastEnrichedAt: data.enrichment.lastEnrichedAt ?? null,
+          });
+        }
+      })
+      .catch(() => {});
+  }
+
+  async function handleBrowserSetup() {
+    setBrowserSettingUp(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/platforms/x/browser-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "setup" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Browser session setup failed");
+        return;
+      }
+      setSuccessMessage("Browser session created successfully!");
+      fetchBrowserSession();
+    } catch {
+      setError("Browser session setup failed");
+    } finally {
+      setBrowserSettingUp(false);
+    }
+  }
+
+  async function handleBrowserValidate() {
+    setBrowserValidating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/platforms/x/browser-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "validate" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Validation failed");
+        return;
+      }
+      if (data.isValid) {
+        setSuccessMessage("Browser session is valid!");
+      } else {
+        setError("Browser session is invalid or expired. Please set up a new session.");
+      }
+      fetchBrowserSession();
+    } catch {
+      setError("Validation failed");
+    } finally {
+      setBrowserValidating(false);
+    }
+  }
+
+  async function handleBrowserClear() {
+    setBrowserClearing(true);
+    setError(null);
+    try {
+      await fetch("/api/platforms/x/browser-session", { method: "DELETE" });
+      setBrowserSession({ loading: false, hasSession: false, lastValidatedAt: null, createdAt: null });
+    } catch {
+      setError("Failed to clear session");
+    } finally {
+      setBrowserClearing(false);
+    }
+  }
+
+  async function handleBulkEnrich() {
+    setBrowserEnriching(true);
+    setEnrichResult(null);
+    setError(null);
+    try {
+      const res = await fetch("/api/platforms/x/enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maxProfiles: 15 }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Enrichment failed");
+        return;
+      }
+      setEnrichResult(data.result);
+      fetchEnrichStatus();
+    } catch {
+      setError("Enrichment failed");
+    } finally {
+      setBrowserEnriching(false);
+    }
+  }
+
   useEffect(() => {
     fetchAuth();
     fetchXStatus();
     fetchSyncStatus();
     fetchLinkedInStatus();
     fetchGmailStatus();
+    fetchBrowserSession();
+    fetchEnrichStatus();
   }, []);
 
   // Handle OAuth callback query params
@@ -1067,6 +1203,152 @@ function SettingsContent() {
               </div>
             </>
           )}
+
+          <Separator />
+
+          {/* Browser Enrichment */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              Browser Enrichment
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Enrich contacts by scraping X profile pages. Requires a browser session
+              (manual login) to access profile data that the API cannot provide.
+            </p>
+
+            {browserSession.loading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Loading session status...
+              </div>
+            ) : (
+              <div className="rounded-lg border p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">X Browser Session</p>
+                    {browserSession.hasSession ? (
+                      <p className="text-xs text-muted-foreground">
+                        Session active
+                        {browserSession.lastValidatedAt && (
+                          <> &middot; Last validated {formatSyncTime(browserSession.lastValidatedAt)}</>
+                        )}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        No session configured. Click Setup to log in via browser.
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {browserSession.hasSession ? (
+                      <>
+                        <Badge variant="default" className="bg-green-600">
+                          <CheckCircle className="mr-1 h-3 w-3" />
+                          Active
+                        </Badge>
+                      </>
+                    ) : (
+                      <Badge variant="secondary">
+                        <XCircle className="mr-1 h-3 w-3" />
+                        Not configured
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {!browserSession.hasSession ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleBrowserSetup}
+                      disabled={browserSettingUp}
+                    >
+                      {browserSettingUp ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : (
+                        <Globe className="mr-1 h-3 w-3" />
+                      )}
+                      {browserSettingUp ? "Opening browser..." : "Setup Session"}
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleBrowserValidate}
+                        disabled={browserValidating}
+                      >
+                        {browserValidating ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        ) : (
+                          <CheckCircle className="mr-1 h-3 w-3" />
+                        )}
+                        Validate
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleBulkEnrich}
+                        disabled={browserEnriching || !xState.connected}
+                      >
+                        {browserEnriching ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        ) : (
+                          <Sparkles className="mr-1 h-3 w-3" />
+                        )}
+                        {browserEnriching ? "Enriching..." : "Enrich Low-Score"}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleBrowserClear}
+                        disabled={browserClearing}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        {browserClearing ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="mr-1 h-3 w-3" />
+                        )}
+                        Clear
+                      </Button>
+                    </>
+                  )}
+                </div>
+
+                {/* Enrichment stats */}
+                {enrichStatus && enrichStatus.totalEnriched > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    <p>Total enriched: {enrichStatus.totalEnriched}</p>
+                    <p>Last enriched: {formatSyncTime(enrichStatus.lastEnrichedAt)}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Enrich result */}
+            {enrichResult && (
+              <div className="rounded-lg border bg-muted/50 p-3 text-sm">
+                <p className="font-medium mb-1">Enrichment Complete</p>
+                <div className="flex gap-4 text-muted-foreground text-xs">
+                  <span>Updated: {enrichResult.updated}</span>
+                  <span>Skipped: {enrichResult.skipped}</span>
+                </div>
+                {enrichResult.errors.length > 0 && (
+                  <div className="mt-2 text-destructive text-xs">
+                    <p className="font-medium">Errors:</p>
+                    <ul className="list-disc pl-4">
+                      {enrichResult.errors.map((err, i) => (
+                        <li key={i}>{err}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
