@@ -209,7 +209,11 @@ function ContentListInner({
                   : null;
 
                 return (
-                  <TableRow key={item.id} className="hover:bg-accent/30 transition-colors">
+                  <TableRow
+                    key={item.id}
+                    className="hover:bg-accent/30 transition-colors cursor-pointer"
+                    onClick={() => router.push(`/dashboard/content/${item.id}`)}
+                  >
                     <TableCell>
                       <div className="space-y-1">
                         {item.title && (
@@ -226,7 +230,8 @@ function ContentListInner({
                               <button
                                 type="button"
                                 className="inline-flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   setExpandedItems((prev) => {
                                     const next = new Set(prev);
                                     if (next.has(item.id)) {
@@ -258,6 +263,7 @@ function ContentListInner({
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   title="View on X"
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   <ExternalLink className="h-3 w-3" />
                                 </a>

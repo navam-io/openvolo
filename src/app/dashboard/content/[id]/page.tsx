@@ -1,21 +1,181 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { getContentItem } from "@/lib/db/queries/content";
+import { listEngagementsByContentPost } from "@/lib/db/queries/engagements";
+import { getPlatformAccountByPlatform } from "@/lib/db/queries/platform-accounts";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, ExternalLink, Heart, MessageCircle, Repeat2, Quote } from "lucide-react";
+import { EngagementActions } from "./engagement-actions";
 
-export default async function ContentDetailPage({ params }: { params: Promise<{ id: string }> }) {
+const contentTypeLabels: Record<string, string> = {
+  post: "Post",
+  article: "Article",
+  thread: "Thread",
+  reply: "Reply",
+  image: "Image",
+  video: "Video",
+  email: "Email",
+  dm: "DM",
+  newsletter: "Newsletter",
+};
+
+function formatDate(unix: number | null | undefined): string {
+  if (!unix) return "Unknown date";
+  return new Date(unix * 1000).toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+export default async function ContentDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
+  const item = getContentItem(id);
+
+  if (!item) {
+    notFound();
+  }
+
+  const snapshot = item.post?.engagementSnapshot
+    ? JSON.parse(item.post.engagementSnapshot)
+    : null;
+
+  // Check if X account is connected (for engagement actions)
+  const xAccount = getPlatformAccountByPlatform("x");
+  const canEngage = !!xAccount && xAccount.status === "active" && !!item.post?.platformPostId;
+
+  // Get engagement history for this post
+  const engagementHistory = item.post
+    ? listEngagementsByContentPost(item.post.id)
+    : [];
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-heading-1">Content Editor</h1>
+    <div className="space-y-6 max-w-3xl">
+      {/* Back navigation */}
+      <div className="flex items-center gap-2">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/dashboard/content">
+            <ArrowLeft className="mr-1 h-4 w-4" />
+            Content
+          </Link>
+        </Button>
+      </div>
+
+      {/* Main content card */}
       <Card>
-        <CardHeader>
-          <CardTitle>Content {id}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Tiptap content editor will be implemented in Phase 3.
+        <CardContent className="pt-6 space-y-4">
+          {/* Header: type badges + date */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">
+                {contentTypeLabels[item.contentType] ?? item.contentType}
+              </Badge>
+              {item.origin && (
+                <Badge variant="outline">{item.origin}</Badge>
+              )}
+              {item.direction && (
+                <Badge variant="outline">{item.direction}</Badge>
+              )}
+            </div>
+            {item.post?.platformUrl && (
+              <Button variant="ghost" size="sm" asChild>
+                <a
+                  href={item.post.platformUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ExternalLink className="mr-1 h-4 w-4" />
+                  View on X
+                </a>
+              </Button>
+            )}
+          </div>
+
+          {/* Title (if present) */}
+          {item.title && (
+            <h2 className="text-lg font-semibold">{item.title}</h2>
+          )}
+
+          {/* Tweet body */}
+          <div className="whitespace-pre-wrap text-sm leading-relaxed">
+            {item.body ?? "No content"}
+          </div>
+
+          {/* Timestamp */}
+          <p className="text-xs text-muted-foreground">
+            {formatDate(item.post?.publishedAt ?? item.createdAt)}
           </p>
+
+          {/* Engagement metrics */}
+          {snapshot && (
+            <div className="flex items-center gap-6 pt-2 border-t text-sm text-muted-foreground">
+              <span className="flex items-center gap-1.5" title="Likes">
+                <Heart className="h-4 w-4" />
+                {snapshot.likes ?? 0}
+              </span>
+              <span className="flex items-center gap-1.5" title="Replies">
+                <MessageCircle className="h-4 w-4" />
+                {snapshot.replies ?? 0}
+              </span>
+              <span className="flex items-center gap-1.5" title="Retweets">
+                <Repeat2 className="h-4 w-4" />
+                {snapshot.retweets ?? 0}
+              </span>
+              <span className="flex items-center gap-1.5" title="Quotes">
+                <Quote className="h-4 w-4" />
+                {snapshot.quotes ?? 0}
+              </span>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Engagement action bar */}
+      {canEngage && item.post && (
+        <EngagementActions
+          tweetId={item.post.platformPostId!}
+          contentPostId={item.post.id}
+          engagementHistory={engagementHistory}
+        />
+      )}
+
+      {/* Engagement history */}
+      {engagementHistory.length > 0 && (
+        <Card>
+          <CardContent className="pt-6">
+            <h3 className="text-sm font-medium mb-3">Your Activity</h3>
+            <div className="space-y-2">
+              {engagementHistory.map((e) => (
+                <div
+                  key={e.id}
+                  className="flex items-center justify-between text-sm text-muted-foreground py-1 border-b last:border-b-0"
+                >
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs">
+                      {e.engagementType}
+                    </Badge>
+                    {e.content && (
+                      <span className="truncate max-w-xs">{e.content}</span>
+                    )}
+                  </div>
+                  <span className="text-xs">
+                    {formatDate(e.createdAt)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

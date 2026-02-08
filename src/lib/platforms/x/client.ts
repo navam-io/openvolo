@@ -278,3 +278,74 @@ export async function getUserMentions(
 
   return xApiFetch<XTweet[]>(accountId, `/users/${userId}/mentions?${params.toString()}`);
 }
+
+// --- Engagement Actions ---
+
+/** Like a tweet. */
+export async function likeTweet(
+  accountId: string,
+  userId: string,
+  tweetId: string
+): Promise<{ liked: boolean }> {
+  const res = await xApiFetch<{ liked: boolean }>(accountId, `/users/${userId}/likes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tweet_id: tweetId }),
+  });
+  return res.data;
+}
+
+/** Unlike a tweet. */
+export async function unlikeTweet(
+  accountId: string,
+  userId: string,
+  tweetId: string
+): Promise<{ liked: boolean }> {
+  const res = await xApiFetch<{ liked: boolean }>(accountId, `/users/${userId}/likes/${tweetId}`, {
+    method: "DELETE",
+  });
+  return res.data;
+}
+
+/** Retweet a tweet. */
+export async function retweet(
+  accountId: string,
+  userId: string,
+  tweetId: string
+): Promise<{ retweeted: boolean }> {
+  const res = await xApiFetch<{ retweeted: boolean }>(accountId, `/users/${userId}/retweets`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tweet_id: tweetId }),
+  });
+  return res.data;
+}
+
+/** Unretweet a tweet. */
+export async function unretweet(
+  accountId: string,
+  userId: string,
+  tweetId: string
+): Promise<{ retweeted: boolean }> {
+  const res = await xApiFetch<{ retweeted: boolean }>(accountId, `/users/${userId}/retweets/${tweetId}`, {
+    method: "DELETE",
+  });
+  return res.data;
+}
+
+/** Reply to a tweet. */
+export async function replyToTweet(
+  accountId: string,
+  tweetId: string,
+  text: string
+): Promise<XTweet> {
+  const res = await xApiFetch<XTweet>(accountId, `/tweets`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      text,
+      reply: { in_reply_to_tweet_id: tweetId },
+    }),
+  });
+  return res.data;
+}
