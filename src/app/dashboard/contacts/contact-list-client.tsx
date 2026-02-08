@@ -126,14 +126,14 @@ export function ContactListClient({
         </Card>
       ) : (
         <div className="rounded-md border">
-          <Table>
+          <Table className="table-fixed">
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead>Identities</TableHead>
-                <TableHead>Stage</TableHead>
-                <TableHead>Enrichment</TableHead>
+                <TableHead className="w-36">Company</TableHead>
+                <TableHead className="w-28">Identities</TableHead>
+                <TableHead className="w-28">Stage</TableHead>
+                <TableHead className="w-28">Enrichment</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -152,7 +152,7 @@ export function ContactListClient({
                       </p>
                     )}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-muted-foreground truncate">
                     {contact.company ?? "—"}
                   </TableCell>
                   <TableCell>
