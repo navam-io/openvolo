@@ -16,6 +16,7 @@ import {
   Loader2,
   Rocket,
   Twitter,
+  Linkedin,
   LayoutList,
   HelpCircle,
   Users,
@@ -45,6 +46,7 @@ interface ChecklistState {
   anthropicKey: boolean;
   xConnected: boolean;
   xSynced: boolean;
+  linkedinConnected: boolean;
 }
 
 function useSetupChecklist(): ChecklistState {
@@ -53,6 +55,7 @@ function useSetupChecklist(): ChecklistState {
     anthropicKey: false,
     xConnected: false,
     xSynced: false,
+    linkedinConnected: false,
   });
 
   useEffect(() => {
@@ -63,12 +66,16 @@ function useSetupChecklist(): ChecklistState {
       fetch("/api/platforms/x")
         .then((r) => r.json())
         .catch(() => ({ connected: false })),
-    ]).then(([settings, xStatus]) => {
+      fetch("/api/platforms/linkedin")
+        .then((r) => r.json())
+        .catch(() => ({ connected: false })),
+    ]).then(([settings, xStatus, linkedinStatus]) => {
       setState({
         loading: false,
         anthropicKey: settings.source !== "none",
         xConnected: xStatus.connected === true,
         xSynced: xStatus.account?.lastSyncedAt != null,
+        linkedinConnected: linkedinStatus.connected === true,
       });
     });
   }, []);
@@ -204,6 +211,12 @@ function GettingStartedTab() {
             href="/dashboard/settings"
           />
           <ChecklistItem
+            label="LinkedIn account connected"
+            done={checklist.linkedinConnected}
+            loading={checklist.loading}
+            href="/dashboard/settings"
+          />
+          <ChecklistItem
             label="First contact sync completed"
             done={checklist.xSynced}
             loading={checklist.loading}
@@ -230,7 +243,9 @@ function GettingStartedTab() {
           </p>
           <CodeBlock>{`ANTHROPIC_API_KEY="sk-ant-..."
 X_CLIENT_ID="your-oauth2-client-id"
-X_CLIENT_SECRET="your-oauth2-client-secret"`}</CodeBlock>
+X_CLIENT_SECRET="your-oauth2-client-secret"
+LINKEDIN_CLIENT_ID="your-linkedin-client-id"
+LINKEDIN_CLIENT_SECRET="your-linkedin-client-secret"`}</CodeBlock>
           <p className="text-xs text-muted-foreground">
             The Anthropic key can also be set via the{" "}
             <Link
@@ -239,7 +254,8 @@ X_CLIENT_SECRET="your-oauth2-client-secret"`}</CodeBlock>
             >
               Settings
             </Link>{" "}
-            page. X credentials must be set as environment variables.
+            page. X and LinkedIn credentials must be set as environment
+            variables.
           </p>
         </CardContent>
       </Card>
@@ -428,6 +444,183 @@ X_CLIENT_SECRET="your-oauth2-client-secret"`}</CodeBlock>
   );
 }
 
+function LinkedInSetupTab() {
+  return (
+    <div className="space-y-6">
+      {/* Prerequisites */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Linkedin className="h-5 w-5" />
+            Prerequisites
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              A LinkedIn Developer account at{" "}
+              <span className="text-primary font-medium">
+                linkedin.com/developers
+              </span>
+            </li>
+            <li>
+              An app with the{" "}
+              <strong className="text-foreground">
+                Sign In with LinkedIn using OpenID Connect
+              </strong>{" "}
+              product enabled
+            </li>
+            <li>No paid tier required — the free API product is sufficient</li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      {/* Step 1 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <StepNumber n={1} />
+            Create LinkedIn App
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <ol className="list-decimal pl-5 space-y-2">
+            <li>
+              Go to{" "}
+              <span className="text-primary font-medium">
+                linkedin.com/developers
+              </span>{" "}
+              and sign in with your LinkedIn account
+            </li>
+            <li>
+              Click{" "}
+              <strong className="text-foreground">Create app</strong> — you will
+              need to associate it with a LinkedIn Company Page (a personal page
+              works fine)
+            </li>
+            <li>
+              Under the{" "}
+              <strong className="text-foreground">Products</strong> tab, request{" "}
+              <strong className="text-foreground">
+                Sign In with LinkedIn using OpenID Connect
+              </strong>
+            </li>
+            <li>Approval is usually instant</li>
+          </ol>
+        </CardContent>
+      </Card>
+
+      {/* Step 2 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <StepNumber n={2} />
+            Configure OAuth 2.0
+          </CardTitle>
+          <CardDescription>
+            Set up the redirect URL and copy your credentials.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <ol className="list-decimal pl-5 space-y-2">
+            <li>
+              In your LinkedIn app, go to the{" "}
+              <strong className="text-foreground">Auth</strong> tab
+            </li>
+            <li>
+              Under{" "}
+              <strong className="text-foreground">
+                OAuth 2.0 settings
+              </strong>
+              , add this redirect URL:
+              <CodeBlock>
+                http://localhost:3000/api/platforms/linkedin/callback
+              </CodeBlock>
+            </li>
+            <li>
+              Copy the{" "}
+              <strong className="text-foreground">Client ID</strong> and{" "}
+              <strong className="text-foreground">Client Secret</strong> from
+              the top of the Auth tab
+            </li>
+          </ol>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+            Save the Client Secret immediately — you may not be able to view it
+            again without regenerating.
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Step 3 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <StepNumber n={3} />
+            Configure OpenVolo
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <p>
+            Add the LinkedIn credentials to your <Code>.env.local</Code>:
+          </p>
+          <CodeBlock>{`LINKEDIN_CLIENT_ID="your-linkedin-client-id"
+LINKEDIN_CLIENT_SECRET="your-linkedin-client-secret"`}</CodeBlock>
+          <p>
+            Restart the dev server (<Code>npm run dev</Code>) to pick up the new
+            variables.
+          </p>
+          <div className="rounded-lg border bg-muted/50 p-3 text-xs">
+            <strong className="text-foreground">Note:</strong> LinkedIn uses
+            standard OAuth 2.0 (no PKCE). The client secret is sent as a POST
+            body parameter during token exchange, not via Basic auth headers.
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Step 4 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <StepNumber n={4} />
+            Connect & Sync
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <ol className="list-decimal pl-5 space-y-2">
+            <li>
+              Go to{" "}
+              <Link
+                href="/dashboard/settings"
+                className="text-primary underline underline-offset-2"
+              >
+                Settings
+              </Link>{" "}
+              &rarr; Platform Connections &rarr; Click{" "}
+              <strong className="text-foreground">Connect</strong> on LinkedIn
+            </li>
+            <li>Authorize OpenVolo on LinkedIn</li>
+            <li>
+              Click{" "}
+              <strong className="text-foreground">Sync Now</strong> to import
+              your LinkedIn connections
+            </li>
+            <li>
+              Contacts appear in{" "}
+              <Link
+                href="/dashboard/contacts"
+                className="text-primary underline underline-offset-2"
+              >
+                Contacts
+              </Link>{" "}
+              with LinkedIn identity badges and enrichment scores
+            </li>
+          </ol>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 function FeaturesTab() {
   return (
     <div className="space-y-6">
@@ -492,6 +685,31 @@ function FeaturesTab() {
               counts
             </li>
             <li>Rate limiting tracked from X API response headers</li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Linkedin className="h-5 w-5" />
+            LinkedIn Sync
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Imports your LinkedIn connections as CRM contacts</li>
+            <li>
+              Deduplicates by LinkedIn platform user ID — re-syncing updates
+              existing contacts
+            </li>
+            <li>
+              Pulls: name, headline, vanity URL, profile photo
+            </li>
+            <li>
+              Cross-platform enrichment: contacts with both X and LinkedIn
+              identities get bonus enrichment score
+            </li>
           </ul>
         </CardContent>
       </Card>
@@ -566,6 +784,16 @@ function FaqTab() {
       a: "Contact sync uses the follows.read endpoint which X removed from the Free tier in August 2025. You need the X API Basic tier ($200/mo). After upgrading your X Developer plan, click \"Enable Contact Sync\" in Settings to re-authorize with the required permissions.",
     },
     {
+      icon: Linkedin,
+      q: "What LinkedIn API product do I need?",
+      a: "\"Sign In with LinkedIn using OpenID Connect\" — it's free and gives access to profile and email data. No paid LinkedIn Developer tier required.",
+    },
+    {
+      icon: Sparkles,
+      q: "How does cross-platform enrichment work?",
+      a: "Contacts matched across X and LinkedIn get a +10 enrichment score bonus for having multiple platform identities. LinkedIn also contributes up to +15 points from professional fields like headline, company, and title.",
+    },
+    {
       icon: UserPlus,
       q: "Can I connect multiple X accounts?",
       a: "Currently one account per platform. The schema supports multiple but the UI assumes single-user.",
@@ -608,7 +836,7 @@ function FaqTab() {
 
 // ─── Main Content ────────────────────────────────────────────────────────────
 
-const VALID_TABS = ["getting-started", "x-setup", "features", "faq"] as const;
+const VALID_TABS = ["getting-started", "x-setup", "linkedin-setup", "features", "faq"] as const;
 type TabValue = (typeof VALID_TABS)[number];
 
 function HelpContent() {
@@ -638,6 +866,10 @@ function HelpContent() {
             <Twitter className="h-4 w-4" />
             X/Twitter Setup
           </TabsTrigger>
+          <TabsTrigger value="linkedin-setup">
+            <Linkedin className="h-4 w-4" />
+            LinkedIn Setup
+          </TabsTrigger>
           <TabsTrigger value="features">
             <LayoutList className="h-4 w-4" />
             Features
@@ -653,6 +885,9 @@ function HelpContent() {
         </TabsContent>
         <TabsContent value="x-setup">
           <XSetupTab />
+        </TabsContent>
+        <TabsContent value="linkedin-setup">
+          <LinkedInSetupTab />
         </TabsContent>
         <TabsContent value="features">
           <FeaturesTab />

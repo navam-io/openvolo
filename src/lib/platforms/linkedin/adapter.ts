@@ -25,20 +25,23 @@ function profileToUserProfile(
   profile: LinkedInProfile,
   email?: string | null
 ): PlatformUserProfile {
-  const firstName = profile.localizedFirstName ?? "";
-  const lastName = profile.localizedLastName ?? "";
-  const displayName = `${firstName} ${lastName}`.trim();
+  // Support both OpenID Connect userinfo and legacy /me shapes
+  const firstName = profile.given_name ?? profile.localizedFirstName ?? "";
+  const lastName = profile.family_name ?? profile.localizedLastName ?? "";
+  const displayName = profile.name ?? `${firstName} ${lastName}`.trim();
   const vanityName = profile.vanityName;
 
-  // Extract photo from nested structure
-  let photoUrl: string | null = null;
-  const elements = profile.profilePicture?.["displayImage~"]?.elements;
-  if (elements && elements.length > 0) {
-    photoUrl = elements[elements.length - 1]?.identifiers?.[0]?.identifier ?? null;
+  // Extract photo: userinfo has `picture` directly, legacy uses nested structure
+  let photoUrl: string | null = profile.picture ?? null;
+  if (!photoUrl) {
+    const elements = profile.profilePicture?.["displayImage~"]?.elements;
+    if (elements && elements.length > 0) {
+      photoUrl = elements[elements.length - 1]?.identifiers?.[0]?.identifier ?? null;
+    }
   }
 
   return {
-    platformUserId: profile.id,
+    platformUserId: profile.sub ?? profile.id ?? "",
     platformHandle: vanityName ? `/in/${vanityName}` : displayName,
     displayName,
     bio: profile.localizedHeadline ?? null,

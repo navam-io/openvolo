@@ -22,10 +22,15 @@ import {
 import { getRateLimitState } from "@/lib/platforms/rate-limiter";
 import { randomBytes } from "crypto";
 
-// Google OAuth scopes — read-only contacts + email metadata
+// Google OAuth scopes — OpenID Connect (for userinfo) + read-only contacts + Gmail read
+// Note: gmail.readonly is required (not gmail.metadata) because messages.list `q` parameter
+// is only supported with gmail.readonly or higher scopes.
 const SCOPES = [
+  "openid",
+  "profile",
+  "email",
   "https://www.googleapis.com/auth/contacts.readonly",
-  "https://www.googleapis.com/auth/gmail.metadata",
+  "https://www.googleapis.com/auth/gmail.readonly",
 ].join(" ");
 
 export class GmailPlatformAdapter implements PlatformAdapter {

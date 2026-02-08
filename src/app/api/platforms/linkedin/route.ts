@@ -1,16 +1,29 @@
 import { NextResponse } from "next/server";
 import { getPlatformAccountByPlatform } from "@/lib/db/queries/platform-accounts";
 import { disconnectLinkedInAccount } from "@/lib/platforms/linkedin/auth";
+import { decrypt } from "@/lib/auth/crypto";
+import type { PlatformCredentials } from "@/lib/platforms/adapter";
 
 /**
  * GET /api/platforms/linkedin
- * Check LinkedIn connection status.
+ * Check LinkedIn connection status including granted scopes.
  */
 export async function GET() {
   const account = getPlatformAccountByPlatform("linkedin");
 
   if (!account) {
     return NextResponse.json({ connected: false });
+  }
+
+  // Extract granted scopes from encrypted credentials
+  let grantedScopes = "";
+  if (account.credentialsEncrypted) {
+    try {
+      const creds: PlatformCredentials = JSON.parse(decrypt(account.credentialsEncrypted));
+      grantedScopes = (creds.grantedScopes ?? "").replace(/,/g, " ");
+    } catch {
+      // Credentials may be corrupted — don't block the status response
+    }
   }
 
   return NextResponse.json({
@@ -21,6 +34,7 @@ export async function GET() {
       status: account.status,
       lastSyncedAt: account.lastSyncedAt,
       createdAt: account.createdAt,
+      grantedScopes,
     },
   });
 }

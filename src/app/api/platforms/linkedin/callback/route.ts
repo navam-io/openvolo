@@ -74,12 +74,14 @@ export async function GET(req: NextRequest) {
       accessToken: tokenData.access_token,
       refreshToken: tokenData.refresh_token ?? "",
       expiresAt: Math.floor(Date.now() / 1000) + (tokenData.expires_in ?? 5184000), // default 60 days
-      grantedScopes: tokenData.scope ?? "",
+      grantedScopes: (tokenData.scope ?? "").replace(/,/g, " "),
     };
 
-    // Fetch user profile from LinkedIn API
+    // Fetch user profile from LinkedIn userinfo endpoint (OpenID Connect)
+    // The /v2/userinfo endpoint works with openid+profile+email scopes
+    // (the older /v2/me endpoint requires the deprecated r_liteprofile scope)
     const profileRes = await fetch(
-      "https://api.linkedin.com/v2/me?projection=(id,localizedFirstName,localizedLastName,localizedHeadline,vanityName)",
+      "https://api.linkedin.com/v2/userinfo",
       {
         headers: { Authorization: `Bearer ${creds.accessToken}` },
       }
@@ -93,8 +95,8 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const profile = await profileRes.json();
-    const displayName = `${profile.localizedFirstName ?? ""} ${profile.localizedLastName ?? ""}`.trim();
+    const userinfo = await profileRes.json();
+    const displayName = userinfo.name ?? `${userinfo.given_name ?? ""} ${userinfo.family_name ?? ""}`.trim();
 
     // Upsert platform account
     const existing = getPlatformAccountByPlatform("linkedin");

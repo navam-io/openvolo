@@ -44,7 +44,7 @@ const SCOPE_META: Record<string, { label: string; group: string }> = {
   "w_member_social": { label: "Create Posts", group: "Content" },
   // Google scopes (full URLs — displayed as friendly labels)
   "https://www.googleapis.com/auth/contacts.readonly": { label: "Read Contacts", group: "Contacts" },
-  "https://www.googleapis.com/auth/gmail.metadata": { label: "Email Metadata", group: "Email" },
+  "https://www.googleapis.com/auth/gmail.readonly": { label: "Read Email", group: "Email" },
   // X scopes
   "tweet.read": { label: "Read Tweets", group: "Tweets" },
   "tweet.write": { label: "Write Tweets", group: "Tweets" },

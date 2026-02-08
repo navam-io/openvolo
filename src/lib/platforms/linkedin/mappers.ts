@@ -15,52 +15,57 @@ function extractPhotoUrl(
   return lastElement?.identifiers?.[0]?.identifier ?? null;
 }
 
-/** Map a LinkedIn profile to OpenVolo contact fields. */
+/** Map a LinkedIn profile (userinfo or legacy) to OpenVolo contact fields. */
 export function mapLinkedInProfileToContact(
   profile: LinkedInProfile,
   email?: string | null
 ): Omit<NewContact, "id"> {
-  const firstName = profile.localizedFirstName ?? "";
-  const lastName = profile.localizedLastName ?? "";
-  const name = `${firstName} ${lastName}`.trim();
-  const photoUrl = extractPhotoUrl(profile.profilePicture);
+  // Support both OpenID Connect userinfo and legacy /me response shapes
+  const firstName = profile.given_name ?? profile.localizedFirstName ?? "";
+  const lastName = profile.family_name ?? profile.localizedLastName ?? "";
+  const name = profile.name ?? `${firstName} ${lastName}`.trim();
+  const photoUrl = profile.picture ?? extractPhotoUrl(profile.profilePicture);
   const vanityName = profile.vanityName;
+  const resolvedEmail = profile.email ?? email ?? null;
 
   return {
     name: name || "Unknown",
     firstName: firstName || null,
     lastName: lastName || null,
     headline: profile.localizedHeadline || null,
-    email: email ?? null,
+    email: resolvedEmail,
     platform: "linkedin" as const,
-    platformUserId: profile.id,
+    platformUserId: profile.sub ?? profile.id ?? "",
     profileUrl: vanityName ? `https://linkedin.com/in/${vanityName}` : null,
-    photoUrl,
-    avatarUrl: photoUrl,
+    photoUrl: photoUrl ?? null,
+    avatarUrl: photoUrl ?? null,
   };
 }
 
-/** Map a LinkedIn profile to a contactIdentity row. */
+/** Map a LinkedIn profile (userinfo or legacy) to a contactIdentity row. */
 export function mapLinkedInProfileToIdentity(
   profile: LinkedInProfile,
   contactId: string,
   email?: string | null
 ): Omit<NewContactIdentity, "id"> {
   const vanityName = profile.vanityName;
-  const displayName = `${profile.localizedFirstName ?? ""} ${profile.localizedLastName ?? ""}`.trim();
+  const firstName = profile.given_name ?? profile.localizedFirstName ?? "";
+  const lastName = profile.family_name ?? profile.localizedLastName ?? "";
+  const displayName = profile.name ?? `${firstName} ${lastName}`.trim();
+  const resolvedEmail = profile.email ?? email ?? null;
 
   return {
     contactId,
     platform: "linkedin" as const,
-    platformUserId: profile.id,
+    platformUserId: profile.sub ?? profile.id ?? "",
     platformHandle: vanityName ? `/in/${vanityName}` : displayName,
     platformUrl: vanityName ? `https://linkedin.com/in/${vanityName}` : null,
     platformData: JSON.stringify({
       headline: profile.localizedHeadline ?? null,
       vanityName: vanityName ?? null,
-      firstName: profile.localizedFirstName ?? null,
-      lastName: profile.localizedLastName ?? null,
-      email: email ?? null,
+      firstName,
+      lastName,
+      email: resolvedEmail,
     }),
     isPrimary: 0,
     isActive: 1,

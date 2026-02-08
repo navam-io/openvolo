@@ -6,10 +6,19 @@ import type { PlatformCredentials } from "@/lib/platforms/adapter";
 
 // --- LinkedIn API Types ---
 
+/** OpenID Connect userinfo response shape */
 export interface LinkedInProfile {
-  id: string;
-  localizedFirstName: string;
-  localizedLastName: string;
+  sub: string;
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+  email?: string;
+  email_verified?: boolean;
+  /** @deprecated Legacy fields — kept for mapper compatibility */
+  id?: string;
+  localizedFirstName?: string;
+  localizedLastName?: string;
   localizedHeadline?: string;
   vanityName?: string;
   profilePicture?: {
@@ -145,22 +154,18 @@ export async function linkedInApiFetch<T>(
 
 // --- Endpoint Functions ---
 
-/** Fetch the authenticated user's LinkedIn profile. */
+/** Fetch the authenticated user's LinkedIn profile via OpenID Connect userinfo. */
 export async function getAuthenticatedProfile(accountId: string): Promise<LinkedInProfile> {
   return linkedInApiFetch<LinkedInProfile>(
     accountId,
-    "/me?projection=(id,localizedFirstName,localizedLastName,localizedHeadline,vanityName,profilePicture(displayImage~:playableStreams))"
+    "/userinfo"
   );
 }
 
-/** Fetch the authenticated user's email address. */
+/** Fetch the authenticated user's email address (included in userinfo response). */
 export async function getAuthenticatedEmail(accountId: string): Promise<string | null> {
-  const data = await linkedInApiFetch<LinkedInEmail>(
-    accountId,
-    "/emailAddress?q=members&projection=(elements*(handle~))"
-  );
-
-  return data.elements?.[0]?.["handle~"]?.emailAddress ?? null;
+  const profile = await getAuthenticatedProfile(accountId);
+  return profile.email ?? null;
 }
 
 /** Fetch the user's connections (offset-based pagination). */
