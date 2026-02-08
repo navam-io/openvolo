@@ -10,7 +10,7 @@ const createTaskSchema = z.object({
   priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
   assignee: z.enum(["user", "agent"]).optional(),
   relatedContactId: z.string().optional(),
-  relatedCampaignId: z.string().optional(),
+  relatedTemplateId: z.string().optional(),
   dueAt: z.number().int().optional(),
 });
 

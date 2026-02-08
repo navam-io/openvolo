@@ -88,14 +88,14 @@ export const contactIdentities = sqliteTable("contact_identities", {
   index("idx_identity_contact").on(table.contactId),
 ]);
 
-// --- Campaigns ---
+// --- Workflow Templates (formerly "campaigns") ---
 
-export const campaigns = sqliteTable("campaigns", {
+export const workflowTemplates = sqliteTable("workflow_templates", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
   platform: text("platform", { enum: ["x", "linkedin", "gmail", "substack"] }),
-  campaignType: text("campaign_type", {
+  templateType: text("template_type", {
     enum: ["outreach", "engagement", "content", "nurture", "prospecting", "enrichment", "pruning"],
   }).notNull(),
   status: text("status", { enum: ["draft", "active", "paused", "completed"] })
@@ -108,13 +108,13 @@ export const campaigns = sqliteTable("campaigns", {
   ...timestamps,
 });
 
-// --- Campaign Steps ---
+// --- Workflow Template Steps (formerly "campaign_steps") ---
 
-export const campaignSteps = sqliteTable("campaign_steps", {
+export const workflowTemplateSteps = sqliteTable("workflow_template_steps", {
   id: text("id").primaryKey(),
-  campaignId: text("campaign_id")
+  templateId: text("template_id")
     .notNull()
-    .references(() => campaigns.id, { onDelete: "cascade" }),
+    .references(() => workflowTemplates.id, { onDelete: "cascade" }),
   stepIndex: integer("step_index").notNull(),
   stepType: text("step_type", {
     enum: ["connect", "message", "follow", "like", "comment", "wait", "condition"],
@@ -123,16 +123,17 @@ export const campaignSteps = sqliteTable("campaign_steps", {
   delayHours: integer("delay_hours").default(0),
 });
 
-// --- Campaign Contacts ---
+// --- Workflow Enrollments (formerly "campaign_contacts") ---
 
-export const campaignContacts = sqliteTable("campaign_contacts", {
+export const workflowEnrollments = sqliteTable("workflow_enrollments", {
   id: text("id").primaryKey(),
-  campaignId: text("campaign_id")
+  templateId: text("template_id")
     .notNull()
-    .references(() => campaigns.id, { onDelete: "cascade" }),
+    .references(() => workflowTemplates.id, { onDelete: "cascade" }),
   contactId: text("contact_id")
     .notNull()
     .references(() => contacts.id, { onDelete: "cascade" }),
+  workflowRunId: text("workflow_run_id").references(() => workflowRuns.id),
   status: text("status", {
     enum: ["pending", "active", "completed", "replied", "removed"],
   })
@@ -232,8 +233,8 @@ export const engagements = sqliteTable("engagements", {
   }).notNull(),
   direction: text("direction", { enum: ["inbound", "outbound"] }).notNull(),
   content: text("content"),
-  campaignId: text("campaign_id").references(() => campaigns.id),
-  agentRunId: text("agent_run_id"),
+  templateId: text("template_id").references(() => workflowTemplates.id),
+  workflowRunId: text("workflow_run_id").references(() => workflowRuns.id),
   // Phase 2 additions
   contentPostId: text("content_post_id").references(() => contentPosts.id),
   platform: text("platform", { enum: ["x", "linkedin", "gmail", "substack"] }),
@@ -271,57 +272,10 @@ export const tasks = sqliteTable("tasks", {
     .notNull()
     .default("user"),
   relatedContactId: text("related_contact_id").references(() => contacts.id),
-  relatedCampaignId: text("related_campaign_id").references(() => campaigns.id),
+  relatedTemplateId: text("related_template_id").references(() => workflowTemplates.id),
   dueAt: integer("due_at"),
   completedAt: integer("completed_at"),
   ...timestamps,
-});
-
-// --- Agent Runs ---
-
-export const agentRuns = sqliteTable("agent_runs", {
-  id: text("id").primaryKey(),
-  agentType: text("agent_type").notNull(),
-  trigger: text("trigger", { enum: ["user", "scheduled", "campaign"] })
-    .notNull()
-    .default("user"),
-  status: text("status", {
-    enum: ["queued", "running", "completed", "failed", "cancelled"],
-  })
-    .notNull()
-    .default("queued"),
-  input: text("input").default("{}"), // JSON
-  output: text("output"), // JSON
-  error: text("error"),
-  model: text("model"),
-  inputTokens: integer("input_tokens").default(0),
-  outputTokens: integer("output_tokens").default(0),
-  costUsd: real("cost_usd").default(0),
-  parentRunId: text("parent_run_id"), // subagent tracking
-  startedAt: integer("started_at"),
-  completedAt: integer("completed_at"),
-  createdAt: integer("created_at")
-    .notNull()
-    .default(sql`(unixepoch())`),
-});
-
-// --- Agent Steps ---
-
-export const agentSteps = sqliteTable("agent_steps", {
-  id: text("id").primaryKey(),
-  agentRunId: text("agent_run_id")
-    .notNull()
-    .references(() => agentRuns.id, { onDelete: "cascade" }),
-  stepIndex: integer("step_index").notNull(),
-  stepType: text("step_type", {
-    enum: ["thinking", "tool_call", "tool_result", "decision", "error"],
-  }).notNull(),
-  description: text("description"),
-  data: text("data"), // JSON
-  durationMs: integer("duration_ms"),
-  createdAt: integer("created_at")
-    .notNull()
-    .default(sql`(unixepoch())`),
 });
 
 // --- Sync Cursors (pagination state for platform imports) ---
@@ -359,9 +313,9 @@ export const syncCursors = sqliteTable("sync_cursors", {
 
 export const workflowRuns = sqliteTable("workflow_runs", {
   id: text("id").primaryKey(),
-  campaignId: text("campaign_id").references(() => campaigns.id),
+  templateId: text("template_id").references(() => workflowTemplates.id),
   workflowType: text("workflow_type", {
-    enum: ["sync", "enrich", "search", "prune"],
+    enum: ["sync", "enrich", "search", "prune", "sequence", "agent"],
   }).notNull(),
   platformAccountId: text("platform_account_id").references(() => platformAccounts.id),
   status: text("status", {
@@ -375,14 +329,22 @@ export const workflowRuns = sqliteTable("workflow_runs", {
   skippedItems: integer("skipped_items").notNull().default(0),
   errorItems: integer("error_items").notNull().default(0),
   config: text("config").default("{}"), // JSON — workflow-specific options
-  agentRunId: text("agent_run_id").references(() => agentRuns.id),
   result: text("result").default("{}"), // JSON — final SyncResult or summary
   errors: text("errors").default("[]"), // JSON array of error strings
+  // Agent tracking columns (merged from agent_runs)
+  trigger: text("trigger", { enum: ["user", "scheduled", "template"] })
+    .notNull()
+    .default("user"),
+  model: text("model"), // AI model ID
+  inputTokens: integer("input_tokens").notNull().default(0),
+  outputTokens: integer("output_tokens").notNull().default(0),
+  costUsd: real("cost_usd").notNull().default(0),
+  parentWorkflowId: text("parent_workflow_id"), // self-FK for sub-workflows
   startedAt: integer("started_at"),
   completedAt: integer("completed_at"),
   ...timestamps,
 }, (table) => [
-  index("idx_workflow_runs_campaign").on(table.campaignId),
+  index("idx_workflow_runs_template").on(table.templateId),
   index("idx_workflow_runs_status").on(table.status),
   index("idx_workflow_runs_type").on(table.workflowType),
 ]);
@@ -400,6 +362,8 @@ export const workflowSteps = sqliteTable("workflow_steps", {
       "url_fetch", "browser_scrape", "web_search", "llm_extract",
       "contact_merge", "contact_create", "contact_archive",
       "routing_decision", "sync_page", "error",
+      // Agent step types (merged from agent_steps)
+      "thinking", "tool_call", "tool_result", "decision", "engagement_action",
     ],
   }).notNull(),
   status: text("status", {

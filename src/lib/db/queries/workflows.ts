@@ -36,6 +36,10 @@ export function updateWorkflowRun(
       | "errors"
       | "startedAt"
       | "completedAt"
+      | "model"
+      | "inputTokens"
+      | "outputTokens"
+      | "costUsd"
     >
   >
 ): WorkflowRun | undefined {
@@ -75,7 +79,7 @@ export function getWorkflowRun(id: string): WorkflowRunWithSteps | undefined {
 export function listWorkflowRuns(opts?: {
   status?: WorkflowRun["status"];
   workflowType?: WorkflowRun["workflowType"];
-  campaignId?: string;
+  templateId?: string;
   page?: number;
   pageSize?: number;
 }): PaginatedResult<WorkflowRun> {
@@ -93,12 +97,12 @@ export function listWorkflowRuns(opts?: {
     conditions.push(
       eq(
         workflowRuns.workflowType,
-        opts.workflowType as "sync" | "enrich" | "search" | "prune"
+        opts.workflowType as "sync" | "enrich" | "search" | "prune" | "sequence" | "agent"
       )
     );
   }
-  if (opts?.campaignId) {
-    conditions.push(eq(workflowRuns.campaignId, opts.campaignId));
+  if (opts?.templateId) {
+    conditions.push(eq(workflowRuns.templateId, opts.templateId));
   }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;

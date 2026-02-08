@@ -1,5 +1,20 @@
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
-import { contacts, contactIdentities, tasks, campaigns, contentItems, contentPosts, agentRuns, engagements, platformAccounts, syncCursors, engagementMetrics, workflowRuns, workflowSteps } from "./schema";
+import {
+  contacts,
+  contactIdentities,
+  tasks,
+  workflowTemplates,
+  workflowTemplateSteps,
+  workflowEnrollments,
+  contentItems,
+  contentPosts,
+  engagements,
+  platformAccounts,
+  syncCursors,
+  engagementMetrics,
+  workflowRuns,
+  workflowSteps,
+} from "./schema";
 
 // Contact types
 export type Contact = InferSelectModel<typeof contacts>;
@@ -38,13 +53,19 @@ export type NewSyncCursor = InferInsertModel<typeof syncCursors>;
 export type EngagementMetric = InferSelectModel<typeof engagementMetrics>;
 export type NewEngagementMetric = InferInsertModel<typeof engagementMetrics>;
 
-// Other entity types (used by dashboard)
-export type Campaign = InferSelectModel<typeof campaigns>;
-export type AgentRun = InferSelectModel<typeof agentRuns>;
+// Engagement types
 export type Engagement = InferSelectModel<typeof engagements>;
 export type NewEngagement = InferInsertModel<typeof engagements>;
 
-// Workflow types
+// Workflow template types (formerly "campaigns")
+export type WorkflowTemplate = InferSelectModel<typeof workflowTemplates>;
+export type NewWorkflowTemplate = InferInsertModel<typeof workflowTemplates>;
+export type WorkflowTemplateStep = InferSelectModel<typeof workflowTemplateSteps>;
+export type NewWorkflowTemplateStep = InferInsertModel<typeof workflowTemplateSteps>;
+export type WorkflowEnrollment = InferSelectModel<typeof workflowEnrollments>;
+export type NewWorkflowEnrollment = InferInsertModel<typeof workflowEnrollments>;
+
+// Workflow run types
 export type WorkflowRun = InferSelectModel<typeof workflowRuns>;
 export type NewWorkflowRun = InferInsertModel<typeof workflowRuns>;
 export type WorkflowStep = InferSelectModel<typeof workflowSteps>;

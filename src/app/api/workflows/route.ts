@@ -4,7 +4,7 @@ import { listWorkflowRuns } from "@/lib/db/queries/workflows";
 /**
  * GET /api/workflows
  * List workflow runs with optional filtering.
- * Query params: status, workflowType, campaignId, page, pageSize
+ * Query params: status, workflowType, templateId, page, pageSize
  */
 export async function GET(req: NextRequest) {
   const url = req.nextUrl;
@@ -12,16 +12,16 @@ export async function GET(req: NextRequest) {
     | "pending" | "running" | "paused" | "completed" | "failed" | "cancelled"
     | null;
   const workflowType = url.searchParams.get("workflowType") as
-    | "sync" | "enrich" | "search" | "prune"
+    | "sync" | "enrich" | "search" | "prune" | "sequence" | "agent"
     | null;
-  const campaignId = url.searchParams.get("campaignId") ?? undefined;
+  const templateId = url.searchParams.get("templateId") ?? undefined;
   const page = parseInt(url.searchParams.get("page") ?? "1", 10);
   const pageSize = parseInt(url.searchParams.get("pageSize") ?? "25", 10);
 
   const result = listWorkflowRuns({
     status: status ?? undefined,
     workflowType: workflowType ?? undefined,
-    campaignId,
+    templateId,
     page,
     pageSize,
   });

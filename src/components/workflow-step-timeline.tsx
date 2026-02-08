@@ -10,6 +10,11 @@ import {
   GitBranch,
   RefreshCw,
   AlertCircle,
+  Lightbulb,
+  Wrench,
+  MessageSquare,
+  Compass,
+  Heart,
   CheckCircle,
   XCircle,
   Clock,
@@ -33,6 +38,12 @@ const STEP_TYPE_CONFIG: Record<
   routing_decision: { label: "Routing Decision", icon: GitBranch, color: "text-indigo-500" },
   sync_page: { label: "Sync", icon: RefreshCw, color: "text-sky-500" },
   error: { label: "Error", icon: AlertCircle, color: "text-destructive" },
+  // Agent step types
+  thinking: { label: "Thinking", icon: Lightbulb, color: "text-yellow-500" },
+  tool_call: { label: "Tool Call", icon: Wrench, color: "text-violet-500" },
+  tool_result: { label: "Tool Result", icon: MessageSquare, color: "text-teal-500" },
+  decision: { label: "Decision", icon: Compass, color: "text-rose-500" },
+  engagement_action: { label: "Engagement", icon: Heart, color: "text-pink-500" },
 };
 
 const STATUS_ICONS: Record<string, typeof CheckCircle> = {

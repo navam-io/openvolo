@@ -6,6 +6,8 @@ import {
   Sparkles,
   Search,
   Trash2,
+  Megaphone,
+  Bot,
   CheckCircle,
   XCircle,
   Clock,
@@ -21,6 +23,8 @@ const TYPE_ICONS: Record<string, typeof RefreshCw> = {
   enrich: Sparkles,
   search: Search,
   prune: Trash2,
+  sequence: Megaphone,
+  agent: Bot,
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -28,6 +32,8 @@ const TYPE_LABELS: Record<string, string> = {
   enrich: "Enrichment",
   search: "Web Search",
   prune: "Pruning",
+  sequence: "Sequence",
+  agent: "AI Agent",
 };
 
 const STATUS_CONFIG: Record<

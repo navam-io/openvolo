@@ -1,5 +1,5 @@
 /** Workflow type identifiers. */
-export type WorkflowType = "sync" | "enrich" | "search" | "prune";
+export type WorkflowType = "sync" | "enrich" | "search" | "prune" | "sequence" | "agent";
 
 /** Step types for workflow observability. */
 export type WorkflowStepType =
@@ -12,7 +12,13 @@ export type WorkflowStepType =
   | "contact_archive"
   | "routing_decision"
   | "sync_page"
-  | "error";
+  | "error"
+  // Agent step types
+  | "thinking"
+  | "tool_call"
+  | "tool_result"
+  | "decision"
+  | "engagement_action";
 
 /** Human-readable labels for workflow types. */
 export const WORKFLOW_TYPE_LABELS: Record<WorkflowType, string> = {
@@ -20,6 +26,8 @@ export const WORKFLOW_TYPE_LABELS: Record<WorkflowType, string> = {
   enrich: "Contact Enrichment",
   search: "Web Search",
   prune: "Contact Pruning",
+  sequence: "Sequence",
+  agent: "AI Agent",
 };
 
 /** Sub-type qualifiers for sync workflows. */
@@ -52,4 +60,12 @@ export interface WorkflowConfig {
   maxContacts?: number;
   contactIds?: string[];
   [key: string]: unknown;
+}
+
+/** Config for agent-type workflows. */
+export interface AgentConfig {
+  model?: string;
+  maxTokens?: number;
+  systemPrompt?: string;
+  tools?: string[];
 }

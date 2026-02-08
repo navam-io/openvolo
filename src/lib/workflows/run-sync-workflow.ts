@@ -13,7 +13,7 @@ interface RunSyncWorkflowOpts {
   workflowType: WorkflowType;
   syncSubType: SyncSubType;
   platformAccountId: string;
-  campaignId?: string;
+  templateId?: string;
   syncFunction: () => Promise<SyncResult>;
 }
 
@@ -37,7 +37,7 @@ export async function runSyncWorkflow(
   const run = createWorkflowRun({
     workflowType: opts.workflowType,
     platformAccountId: opts.platformAccountId,
-    campaignId: opts.campaignId,
+    templateId: opts.templateId,
     status: "running",
     config: JSON.stringify(config),
     startedAt: now,

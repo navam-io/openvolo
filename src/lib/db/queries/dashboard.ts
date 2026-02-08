@@ -1,6 +1,6 @@
 import { desc, eq, count } from "drizzle-orm";
 import { db } from "@/lib/db/client";
-import { contacts, tasks, campaigns, contentItems } from "@/lib/db/schema";
+import { contacts, tasks, workflowRuns, contentItems } from "@/lib/db/schema";
 import type { Contact, Task } from "@/lib/db/types";
 
 export interface FunnelDistribution {
@@ -29,7 +29,7 @@ export function getFunnelDistribution(): FunnelDistribution[] {
 
 export interface DashboardMetrics {
   totalContacts: number;
-  activeCampaigns: number;
+  activeWorkflows: number;
   pendingTasks: number;
   contentItems: number;
   recentContacts: Contact[];
@@ -39,10 +39,10 @@ export interface DashboardMetrics {
 export function getDashboardMetrics(): DashboardMetrics {
   const totalContacts = db.select({ value: count() }).from(contacts).get()?.value ?? 0;
 
-  const activeCampaigns = db
+  const activeWorkflows = db
     .select({ value: count() })
-    .from(campaigns)
-    .where(eq(campaigns.status, "active"))
+    .from(workflowRuns)
+    .where(eq(workflowRuns.status, "running"))
     .get()?.value ?? 0;
 
   const pendingTasks = db
@@ -70,7 +70,7 @@ export function getDashboardMetrics(): DashboardMetrics {
 
   return {
     totalContacts,
-    activeCampaigns,
+    activeWorkflows,
     pendingTasks,
     contentItems: totalContent,
     recentContacts,

@@ -1,0 +1,211 @@
+import { eq, and, desc, count, asc, SQL } from "drizzle-orm";
+import { nanoid } from "nanoid";
+import { db } from "@/lib/db/client";
+import {
+  workflowTemplates,
+  workflowTemplateSteps,
+  workflowEnrollments,
+  contacts,
+} from "@/lib/db/schema";
+import type {
+  WorkflowTemplate,
+  NewWorkflowTemplate,
+  WorkflowTemplateStep,
+  NewWorkflowTemplateStep,
+  WorkflowEnrollment,
+  NewWorkflowEnrollment,
+  PaginatedResult,
+} from "@/lib/db/types";
+
+// ── Templates ──────────────────────────────────
+
+export function createTemplate(
+  data: Omit<NewWorkflowTemplate, "id">
+): WorkflowTemplate {
+  const id = nanoid();
+  db.insert(workflowTemplates).values({ ...data, id }).run();
+  return db
+    .select()
+    .from(workflowTemplates)
+    .where(eq(workflowTemplates.id, id))
+    .get()!;
+}
+
+export function updateTemplate(
+  id: string,
+  data: Partial<
+    Pick<
+      WorkflowTemplate,
+      "name" | "description" | "platform" | "templateType" | "status" | "config" | "goalMetrics" | "startsAt" | "endsAt"
+    >
+  >
+): WorkflowTemplate | undefined {
+  const existing = db
+    .select()
+    .from(workflowTemplates)
+    .where(eq(workflowTemplates.id, id))
+    .get();
+  if (!existing) return undefined;
+
+  db.update(workflowTemplates)
+    .set({ ...data, updatedAt: Math.floor(Date.now() / 1000) })
+    .where(eq(workflowTemplates.id, id))
+    .run();
+
+  return db
+    .select()
+    .from(workflowTemplates)
+    .where(eq(workflowTemplates.id, id))
+    .get();
+}
+
+export type WorkflowTemplateWithSteps = WorkflowTemplate & {
+  steps: WorkflowTemplateStep[];
+  enrollmentCount: number;
+};
+
+export function getTemplate(
+  id: string
+): WorkflowTemplateWithSteps | undefined {
+  const template = db
+    .select()
+    .from(workflowTemplates)
+    .where(eq(workflowTemplates.id, id))
+    .get();
+  if (!template) return undefined;
+
+  const steps = db
+    .select()
+    .from(workflowTemplateSteps)
+    .where(eq(workflowTemplateSteps.templateId, id))
+    .orderBy(asc(workflowTemplateSteps.stepIndex))
+    .all();
+
+  const enrollmentCount =
+    db
+      .select({ value: count() })
+      .from(workflowEnrollments)
+      .where(eq(workflowEnrollments.templateId, id))
+      .get()?.value ?? 0;
+
+  return { ...template, steps, enrollmentCount };
+}
+
+export function listTemplates(opts?: {
+  status?: WorkflowTemplate["status"];
+  templateType?: WorkflowTemplate["templateType"];
+  page?: number;
+  pageSize?: number;
+}): PaginatedResult<WorkflowTemplate> {
+  const conditions: SQL[] = [];
+
+  if (opts?.status) {
+    conditions.push(
+      eq(
+        workflowTemplates.status,
+        opts.status as "draft" | "active" | "paused" | "completed"
+      )
+    );
+  }
+  if (opts?.templateType) {
+    conditions.push(
+      eq(
+        workflowTemplates.templateType,
+        opts.templateType as "outreach" | "engagement" | "content" | "nurture" | "prospecting" | "enrichment" | "pruning"
+      )
+    );
+  }
+
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+  const total =
+    db
+      .select({ value: count() })
+      .from(workflowTemplates)
+      .where(whereClause)
+      .get()?.value ?? 0;
+
+  const page = opts?.page ?? 1;
+  const pageSize = opts?.pageSize ?? 25;
+
+  const data = db
+    .select()
+    .from(workflowTemplates)
+    .where(whereClause)
+    .orderBy(desc(workflowTemplates.createdAt))
+    .limit(pageSize)
+    .offset((page - 1) * pageSize)
+    .all();
+
+  return { data, total };
+}
+
+export function deleteTemplate(id: string): boolean {
+  const existing = db
+    .select()
+    .from(workflowTemplates)
+    .where(eq(workflowTemplates.id, id))
+    .get();
+  if (!existing) return false;
+
+  // Cascade deletes steps + enrollments via FK onDelete
+  db.delete(workflowTemplates)
+    .where(eq(workflowTemplates.id, id))
+    .run();
+  return true;
+}
+
+// ── Template Steps ─────────────────────────────
+
+export function addTemplateStep(
+  data: Omit<NewWorkflowTemplateStep, "id">
+): WorkflowTemplateStep {
+  const id = nanoid();
+  db.insert(workflowTemplateSteps).values({ ...data, id }).run();
+  return db
+    .select()
+    .from(workflowTemplateSteps)
+    .where(eq(workflowTemplateSteps.id, id))
+    .get()!;
+}
+
+// ── Enrollments ────────────────────────────────
+
+export function enrollContact(
+  data: Omit<NewWorkflowEnrollment, "id">
+): WorkflowEnrollment {
+  const id = nanoid();
+  db.insert(workflowEnrollments).values({ ...data, id }).run();
+  return db
+    .select()
+    .from(workflowEnrollments)
+    .where(eq(workflowEnrollments.id, id))
+    .get()!;
+}
+
+export type EnrollmentWithContact = WorkflowEnrollment & {
+  contactName: string;
+  contactEmail: string | null;
+};
+
+export function listEnrollments(
+  templateId: string
+): EnrollmentWithContact[] {
+  const rows = db
+    .select({
+      enrollment: workflowEnrollments,
+      contactName: contacts.name,
+      contactEmail: contacts.email,
+    })
+    .from(workflowEnrollments)
+    .innerJoin(contacts, eq(workflowEnrollments.contactId, contacts.id))
+    .where(eq(workflowEnrollments.templateId, templateId))
+    .orderBy(desc(workflowEnrollments.enrolledAt))
+    .all();
+
+  return rows.map((r) => ({
+    ...r.enrollment,
+    contactName: r.contactName,
+    contactEmail: r.contactEmail,
+  }));
+}

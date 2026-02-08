@@ -1,5 +1,5 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Users, Megaphone, CheckSquare, FileText } from "lucide-react";
+import { Users, Activity, CheckSquare, FileText } from "lucide-react";
 import { getDashboardMetrics, getFunnelDistribution } from "@/lib/db/queries/dashboard";
 import { FunnelStageBadge } from "@/components/funnel-stage-badge";
 import { PriorityBadge } from "@/components/priority-badge";
@@ -34,10 +34,10 @@ export default function DashboardPage() {
       icon: Users,
     },
     {
-      title: "Campaigns",
-      value: metrics.activeCampaigns,
-      description: "Active campaigns",
-      icon: Megaphone,
+      title: "Workflows",
+      value: metrics.activeWorkflows,
+      description: "Active workflows",
+      icon: Activity,
     },
     {
       title: "Pending Tasks",

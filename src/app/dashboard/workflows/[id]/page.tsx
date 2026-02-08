@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { getWorkflowRun } from "@/lib/db/queries/workflows";
-import { WorkflowStepTimeline } from "@/components/workflow-step-timeline";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -8,6 +7,8 @@ import {
   Sparkles,
   Search,
   Trash2,
+  Megaphone,
+  Bot,
   ArrowLeft,
   CheckCircle,
   XCircle,
@@ -15,16 +16,21 @@ import {
   Loader2,
   Pause,
   Ban,
+  Cpu,
+  Coins,
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { formatWorkflowError } from "@/lib/workflows/format-error";
+import { WorkflowDetailSteps } from "./workflow-detail-steps";
 
 const TYPE_ICONS: Record<string, typeof RefreshCw> = {
   sync: RefreshCw,
   enrich: Sparkles,
   search: Search,
   prune: Trash2,
+  sequence: Megaphone,
+  agent: Bot,
 };
 
 const SYNC_SUBTYPE_LABELS: Record<string, string> = {
@@ -89,6 +95,9 @@ export default async function WorkflowDetailPage({
     }
   } catch { /* ignore */ }
 
+  const isAgent = run.workflowType === "agent";
+  const totalTokens = run.inputTokens + run.outputTokens;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -127,6 +136,50 @@ export default async function WorkflowDetailPage({
         <StatCard label="Errors" value={run.errorItems} color="text-destructive" />
       </div>
 
+      {/* Agent-specific cards */}
+      {isAgent && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {run.model && (
+            <Card className="p-3 flex items-center gap-3">
+              <div className="rounded bg-muted p-2">
+                <Cpu className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Model</p>
+                <p className="text-sm font-medium font-mono">{run.model}</p>
+              </div>
+            </Card>
+          )}
+          <Card className="p-3 flex items-center gap-3">
+            <div className="rounded bg-muted p-2">
+              <Bot className="h-4 w-4 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Tokens</p>
+              <p className="text-sm font-medium tabular-nums">
+                {totalTokens.toLocaleString()}
+                <span className="text-xs text-muted-foreground ml-1">
+                  ({run.inputTokens.toLocaleString()} in / {run.outputTokens.toLocaleString()} out)
+                </span>
+              </p>
+            </div>
+          </Card>
+          {run.costUsd > 0 && (
+            <Card className="p-3 flex items-center gap-3">
+              <div className="rounded bg-muted p-2">
+                <Coins className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Cost</p>
+                <p className="text-sm font-medium tabular-nums">
+                  ${run.costUsd.toFixed(4)}
+                </p>
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* Duration */}
       <Card className="p-4">
         <div className="flex items-center justify-between text-sm">
@@ -137,18 +190,8 @@ export default async function WorkflowDetailPage({
         </div>
       </Card>
 
-      {/* Step timeline */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-medium text-muted-foreground">
-          Step Timeline
-          <Badge variant="secondary" className="ml-2 text-[10px]">
-            {run.steps.length}
-          </Badge>
-        </h2>
-        <Card className="p-2">
-          <WorkflowStepTimeline steps={run.steps} />
-        </Card>
-      </section>
+      {/* Step section with Timeline/Graph toggle */}
+      <WorkflowDetailSteps steps={run.steps} />
 
       {/* Errors (if any) */}
       {run.errorItems > 0 && (

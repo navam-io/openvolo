@@ -3,9 +3,7 @@
 import {
   LayoutDashboard,
   Users,
-  Megaphone,
   FileText,
-  Bot,
   GitBranch,
   Settings,
   HelpCircle,
@@ -30,9 +28,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Contacts", href: "/dashboard/contacts", icon: Users },
-  { title: "Campaigns", href: "/dashboard/campaigns", icon: Megaphone },
   { title: "Content", href: "/dashboard/content", icon: FileText },
-  { title: "Agents", href: "/dashboard/agents", icon: Bot },
   { title: "Workflows", href: "/dashboard/workflows", icon: GitBranch },
 ];
 
