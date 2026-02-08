@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" /></a>
-  <img alt="Node >= 18" src="https://img.shields.io/badge/Node-%3E%3D18-green.svg" />
+  <img alt="Node 18+" src="https://img.shields.io/badge/Node-18%2B-green.svg" />
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.8-blue.svg" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16.1-black.svg" />
 </p>
