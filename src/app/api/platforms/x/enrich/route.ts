@@ -3,6 +3,7 @@ import { getPlatformAccountByPlatform } from "@/lib/db/queries/platform-accounts
 import { listSyncCursors } from "@/lib/db/queries/sync";
 import { hasSession } from "@/lib/browser/session";
 import { syncXProfiles } from "@/lib/platforms/sync-x-profiles";
+import { runSyncWorkflow } from "@/lib/workflows/run-sync-workflow";
 
 /**
  * POST /api/platforms/x/enrich
@@ -27,12 +28,20 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json().catch(() => ({}));
-    const result = await syncXProfiles(account.id, {
-      contactIds: body.contactIds,
-      maxProfiles: body.maxProfiles ?? 15,
+    const maxProfiles = body.maxProfiles ?? 15;
+
+    const { workflowRun, syncResult } = await runSyncWorkflow({
+      workflowType: "enrich",
+      syncSubType: "x_enrich",
+      platformAccountId: account.id,
+      syncFunction: () =>
+        syncXProfiles(account.id, {
+          contactIds: body.contactIds,
+          maxProfiles,
+        }),
     });
 
-    return NextResponse.json({ success: true, result });
+    return NextResponse.json({ success: true, result: syncResult, workflowRunId: workflowRun.id });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Enrichment failed";
     return NextResponse.json({ error: message }, { status: 500 });

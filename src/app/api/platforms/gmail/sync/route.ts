@@ -3,6 +3,7 @@ import { getPlatformAccountByPlatform } from "@/lib/db/queries/platform-accounts
 import { listSyncCursors } from "@/lib/db/queries/sync";
 import { syncContactsFromGmail } from "@/lib/platforms/sync-gmail-contacts";
 import { syncGmailMetadata } from "@/lib/platforms/sync-gmail-metadata";
+import { runSyncWorkflow } from "@/lib/workflows/run-sync-workflow";
 
 /**
  * POST /api/platforms/gmail/sync
@@ -31,17 +32,25 @@ export async function POST(req: NextRequest) {
 
     switch (syncType) {
       case "metadata": {
-        const result = await syncGmailMetadata(account.id, {
-          maxContacts: body.maxContacts ?? 50,
+        const maxContacts = body.maxContacts ?? 50;
+        const { workflowRun, syncResult } = await runSyncWorkflow({
+          workflowType: "enrich",
+          syncSubType: "gmail_metadata",
+          platformAccountId: account.id,
+          syncFunction: () => syncGmailMetadata(account.id, { maxContacts }),
         });
-        return NextResponse.json({ success: true, result });
+        return NextResponse.json({ success: true, result: syncResult, workflowRunId: workflowRun.id });
       }
       case "contacts":
       default: {
-        const result = await syncContactsFromGmail(account.id, {
-          maxPages: body.maxPages ?? 10,
+        const maxPages = body.maxPages ?? 10;
+        const { workflowRun, syncResult } = await runSyncWorkflow({
+          workflowType: "sync",
+          syncSubType: "gmail_contacts",
+          platformAccountId: account.id,
+          syncFunction: () => syncContactsFromGmail(account.id, { maxPages }),
         });
-        return NextResponse.json({ success: true, result });
+        return NextResponse.json({ success: true, result: syncResult, workflowRunId: workflowRun.id });
       }
     }
   } catch (error) {

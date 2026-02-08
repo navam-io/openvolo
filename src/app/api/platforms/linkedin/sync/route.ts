@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPlatformAccountByPlatform } from "@/lib/db/queries/platform-accounts";
 import { listSyncCursors } from "@/lib/db/queries/sync";
 import { syncContactsFromLinkedIn } from "@/lib/platforms/sync-linkedin-contacts";
+import { runSyncWorkflow } from "@/lib/workflows/run-sync-workflow";
 
 /**
  * POST /api/platforms/linkedin/sync
@@ -31,10 +32,14 @@ export async function POST(req: NextRequest) {
     switch (syncType) {
       case "contacts":
       default: {
-        const result = await syncContactsFromLinkedIn(account.id, {
-          maxPages: body.maxPages ?? 10,
+        const maxPages = body.maxPages ?? 10;
+        const { workflowRun, syncResult } = await runSyncWorkflow({
+          workflowType: "sync",
+          syncSubType: "linkedin_contacts",
+          platformAccountId: account.id,
+          syncFunction: () => syncContactsFromLinkedIn(account.id, { maxPages }),
         });
-        return NextResponse.json({ success: true, result });
+        return NextResponse.json({ success: true, result: syncResult, workflowRunId: workflowRun.id });
       }
     }
   } catch (error) {

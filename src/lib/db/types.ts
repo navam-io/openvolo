@@ -1,5 +1,5 @@
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
-import { contacts, contactIdentities, tasks, campaigns, contentItems, contentPosts, agentRuns, engagements, platformAccounts, syncCursors, engagementMetrics } from "./schema";
+import { contacts, contactIdentities, tasks, campaigns, contentItems, contentPosts, agentRuns, engagements, platformAccounts, syncCursors, engagementMetrics, workflowRuns, workflowSteps } from "./schema";
 
 // Contact types
 export type Contact = InferSelectModel<typeof contacts>;
@@ -43,6 +43,13 @@ export type Campaign = InferSelectModel<typeof campaigns>;
 export type AgentRun = InferSelectModel<typeof agentRuns>;
 export type Engagement = InferSelectModel<typeof engagements>;
 export type NewEngagement = InferInsertModel<typeof engagements>;
+
+// Workflow types
+export type WorkflowRun = InferSelectModel<typeof workflowRuns>;
+export type NewWorkflowRun = InferInsertModel<typeof workflowRuns>;
+export type WorkflowStep = InferSelectModel<typeof workflowSteps>;
+export type NewWorkflowStep = InferInsertModel<typeof workflowSteps>;
+export type WorkflowRunWithSteps = WorkflowRun & { steps: WorkflowStep[] };
 
 export interface PaginatedResult<T> {
   data: T[];

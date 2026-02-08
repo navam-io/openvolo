@@ -96,7 +96,7 @@ export const campaigns = sqliteTable("campaigns", {
   description: text("description"),
   platform: text("platform", { enum: ["x", "linkedin", "gmail", "substack"] }),
   campaignType: text("campaign_type", {
-    enum: ["outreach", "engagement", "content", "nurture"],
+    enum: ["outreach", "engagement", "content", "nurture", "prospecting", "enrichment", "pruning"],
   }).notNull(),
   status: text("status", { enum: ["draft", "active", "paused", "completed"] })
     .notNull()
@@ -353,6 +353,72 @@ export const syncCursors = sqliteTable("sync_cursors", {
   ...timestamps,
 }, (table) => [
   uniqueIndex("idx_sync_cursor_account_type").on(table.platformAccountId, table.dataType),
+]);
+
+// --- Workflow Runs (observable pipeline executions) ---
+
+export const workflowRuns = sqliteTable("workflow_runs", {
+  id: text("id").primaryKey(),
+  campaignId: text("campaign_id").references(() => campaigns.id),
+  workflowType: text("workflow_type", {
+    enum: ["sync", "enrich", "search", "prune"],
+  }).notNull(),
+  platformAccountId: text("platform_account_id").references(() => platformAccounts.id),
+  status: text("status", {
+    enum: ["pending", "running", "paused", "completed", "failed", "cancelled"],
+  })
+    .notNull()
+    .default("pending"),
+  totalItems: integer("total_items"),
+  processedItems: integer("processed_items").notNull().default(0),
+  successItems: integer("success_items").notNull().default(0),
+  skippedItems: integer("skipped_items").notNull().default(0),
+  errorItems: integer("error_items").notNull().default(0),
+  config: text("config").default("{}"), // JSON — workflow-specific options
+  agentRunId: text("agent_run_id").references(() => agentRuns.id),
+  result: text("result").default("{}"), // JSON — final SyncResult or summary
+  errors: text("errors").default("[]"), // JSON array of error strings
+  startedAt: integer("started_at"),
+  completedAt: integer("completed_at"),
+  ...timestamps,
+}, (table) => [
+  index("idx_workflow_runs_campaign").on(table.campaignId),
+  index("idx_workflow_runs_status").on(table.status),
+  index("idx_workflow_runs_type").on(table.workflowType),
+]);
+
+// --- Workflow Steps (individual actions within a workflow run) ---
+
+export const workflowSteps = sqliteTable("workflow_steps", {
+  id: text("id").primaryKey(),
+  workflowRunId: text("workflow_run_id")
+    .notNull()
+    .references(() => workflowRuns.id, { onDelete: "cascade" }),
+  stepIndex: integer("step_index").notNull(),
+  stepType: text("step_type", {
+    enum: [
+      "url_fetch", "browser_scrape", "web_search", "llm_extract",
+      "contact_merge", "contact_create", "contact_archive",
+      "routing_decision", "sync_page", "error",
+    ],
+  }).notNull(),
+  status: text("status", {
+    enum: ["pending", "running", "completed", "failed", "skipped"],
+  })
+    .notNull()
+    .default("pending"),
+  contactId: text("contact_id").references(() => contacts.id),
+  url: text("url"),
+  tool: text("tool"), // which tool executed this step
+  input: text("input").default("{}"), // JSON
+  output: text("output").default("{}"), // JSON
+  error: text("error"),
+  durationMs: integer("duration_ms"),
+  createdAt: integer("created_at")
+    .notNull()
+    .default(sql`(unixepoch())`),
+}, (table) => [
+  index("idx_workflow_steps_run").on(table.workflowRunId),
 ]);
 
 // --- Engagement Metrics (time-series snapshots) ---

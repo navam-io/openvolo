@@ -5,6 +5,7 @@ import { syncContactsFromPlatform } from "@/lib/platforms/sync-contacts";
 import { syncTweetsFromX, syncMentionsFromX } from "@/lib/platforms/sync-content";
 import { TierRestrictedError } from "@/lib/platforms/x/client";
 import { decrypt } from "@/lib/auth/crypto";
+import { runSyncWorkflow } from "@/lib/workflows/run-sync-workflow";
 import type { PlatformCredentials } from "@/lib/platforms/adapter";
 
 /**
@@ -35,18 +36,28 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const syncType = body.type || "contacts";
 
-    // Route to the appropriate sync handler
+    // Route to the appropriate sync handler (each wrapped with workflow tracking)
     switch (syncType) {
       case "tweets": {
-        // tweet.read is available on Free tier
-        const result = await syncTweetsFromX(account.id, { maxPages: body.maxPages ?? 5 });
-        return NextResponse.json({ success: true, result });
+        const maxPages = body.maxPages ?? 5;
+        const { workflowRun, syncResult } = await runSyncWorkflow({
+          workflowType: "sync",
+          syncSubType: "x_tweets",
+          platformAccountId: account.id,
+          syncFunction: () => syncTweetsFromX(account.id, { maxPages }),
+        });
+        return NextResponse.json({ success: true, result: syncResult, workflowRunId: workflowRun.id });
       }
 
       case "mentions": {
-        // tweet.read is available on Free tier
-        const result = await syncMentionsFromX(account.id, { maxPages: body.maxPages ?? 5 });
-        return NextResponse.json({ success: true, result });
+        const maxPages = body.maxPages ?? 5;
+        const { workflowRun, syncResult } = await runSyncWorkflow({
+          workflowType: "sync",
+          syncSubType: "x_mentions",
+          platformAccountId: account.id,
+          syncFunction: () => syncMentionsFromX(account.id, { maxPages }),
+        });
+        return NextResponse.json({ success: true, result: syncResult, workflowRunId: workflowRun.id });
       }
 
       case "contacts":
@@ -70,8 +81,13 @@ export async function POST(req: NextRequest) {
         }
 
         const maxPages = body.type === "delta" ? 2 : 10;
-        const result = await syncContactsFromPlatform(account.id, { maxPages });
-        return NextResponse.json({ success: true, result });
+        const { workflowRun, syncResult } = await runSyncWorkflow({
+          workflowType: "sync",
+          syncSubType: "x_contacts",
+          platformAccountId: account.id,
+          syncFunction: () => syncContactsFromPlatform(account.id, { maxPages }),
+        });
+        return NextResponse.json({ success: true, result: syncResult, workflowRunId: workflowRun.id });
       }
     }
   } catch (error) {
