@@ -5,6 +5,7 @@ import {
   Users,
   FileText,
   GitBranch,
+  BarChart3,
   Settings,
   HelpCircle,
 } from "lucide-react";
@@ -30,6 +31,7 @@ const navItems = [
   { title: "Contacts", href: "/dashboard/contacts", icon: Users },
   { title: "Content", href: "/dashboard/content", icon: FileText },
   { title: "Workflows", href: "/dashboard/workflows", icon: GitBranch },
+  { title: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
 ];
 
 export function AppSidebar() {
