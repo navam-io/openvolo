@@ -1,5 +1,5 @@
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
-import { contacts, contactIdentities, tasks, campaigns, contentItems, agentRuns, engagements, platformAccounts } from "./schema";
+import { contacts, contactIdentities, tasks, campaigns, contentItems, contentPosts, agentRuns, engagements, platformAccounts, syncCursors, engagementMetrics } from "./schema";
 
 // Contact types
 export type Contact = InferSelectModel<typeof contacts>;
@@ -18,8 +18,27 @@ export type NewTask = InferInsertModel<typeof tasks>;
 export type PlatformAccount = InferSelectModel<typeof platformAccounts>;
 export type NewPlatformAccount = InferInsertModel<typeof platformAccounts>;
 
+// Content types
+export type ContentItem = InferSelectModel<typeof contentItems>;
+export type NewContentItem = InferInsertModel<typeof contentItems>;
+export type ContentPost = InferSelectModel<typeof contentPosts>;
+export type NewContentPost = InferInsertModel<typeof contentPosts>;
+
+// Content with post — joined content_item + content_post
+export type ContentItemWithPost = ContentItem & {
+  post: ContentPost | null;
+  metrics: EngagementMetric | null;
+};
+
+// Sync cursor types
+export type SyncCursor = InferSelectModel<typeof syncCursors>;
+export type NewSyncCursor = InferInsertModel<typeof syncCursors>;
+
+// Engagement metric types
+export type EngagementMetric = InferSelectModel<typeof engagementMetrics>;
+export type NewEngagementMetric = InferInsertModel<typeof engagementMetrics>;
+
 // Other entity types (used by dashboard)
 export type Campaign = InferSelectModel<typeof campaigns>;
-export type ContentItem = InferSelectModel<typeof contentItems>;
 export type AgentRun = InferSelectModel<typeof agentRuns>;
 export type Engagement = InferSelectModel<typeof engagements>;

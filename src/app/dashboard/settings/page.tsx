@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Key, CheckCircle, XCircle, Loader2, Monitor } from "lucide-react";
+import { Key, CheckCircle, XCircle, Loader2, Monitor, Download } from "lucide-react";
 import { PlatformConnectionCard } from "@/components/platform-connection-card";
 
 type AuthSource = "env_var" | "config" | "none";
@@ -67,6 +67,11 @@ function SettingsContent() {
   const [syncResult, setSyncResult] = useState<SyncResultState | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+  // Content sync state
+  const [syncingContent, setSyncingContent] = useState<string | null>(null);
+  const [contentSyncResult, setContentSyncResult] = useState<{ type: string; added: number; skipped: number } | null>(null);
+  const [syncStatus, setSyncStatus] = useState<Record<string, { status: string; totalSynced: number; lastSyncedAt: number | null }>>({});
+
   function fetchAuth() {
     fetch("/api/settings")
       .then((r) => r.json())
@@ -95,9 +100,21 @@ function SettingsContent() {
       });
   }
 
+  function fetchSyncStatus() {
+    fetch("/api/platforms/x/sync")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.cursors) {
+          setSyncStatus(data.cursors);
+        }
+      })
+      .catch(() => {});
+  }
+
   useEffect(() => {
     fetchAuth();
     fetchXStatus();
+    fetchSyncStatus();
   }, []);
 
   // Handle OAuth callback query params
@@ -227,6 +244,43 @@ function SettingsContent() {
     } finally {
       setSyncing(false);
     }
+  }
+
+  async function handleContentSync(type: "tweets" | "mentions") {
+    setSyncingContent(type);
+    setContentSyncResult(null);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/platforms/x/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Content sync failed");
+        return;
+      }
+
+      setContentSyncResult({ type, added: data.result.added, skipped: data.result.skipped });
+      fetchSyncStatus();
+    } catch {
+      setError("Content sync failed");
+    } finally {
+      setSyncingContent(null);
+    }
+  }
+
+  function formatSyncTime(unix: number | null | undefined): string {
+    if (!unix) return "Never";
+    return new Date(unix * 1000).toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
   }
 
   function getXConnectionStatus(): "disconnected" | "connected" | "needs_reauth" {
@@ -421,6 +475,82 @@ function SettingsContent() {
                 </div>
               )}
             </div>
+          )}
+
+          {/* Content Sync Status */}
+          {xState.connected && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium">Content Sync</h3>
+                <p className="text-xs text-muted-foreground">
+                  Import your tweets and mentions from X. Available on Free tier.
+                </p>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {/* Tweets sync */}
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Tweets</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleContentSync("tweets")}
+                        disabled={syncingContent !== null}
+                      >
+                        {syncingContent === "tweets" ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        ) : (
+                          <Download className="mr-1 h-3 w-3" />
+                        )}
+                        Sync
+                      </Button>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      <p>Total synced: {syncStatus.tweets?.totalSynced ?? 0}</p>
+                      <p>Last sync: {formatSyncTime(syncStatus.tweets?.lastSyncedAt)}</p>
+                    </div>
+                  </div>
+
+                  {/* Mentions sync */}
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium">Mentions</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleContentSync("mentions")}
+                        disabled={syncingContent !== null}
+                      >
+                        {syncingContent === "mentions" ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        ) : (
+                          <Download className="mr-1 h-3 w-3" />
+                        )}
+                        Sync
+                      </Button>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      <p>Total synced: {syncStatus.mentions?.totalSynced ?? 0}</p>
+                      <p>Last sync: {formatSyncTime(syncStatus.mentions?.lastSyncedAt)}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Content sync result */}
+                {contentSyncResult && (
+                  <div className="rounded-lg border bg-muted/50 p-3 text-sm">
+                    <p className="font-medium mb-1">
+                      {contentSyncResult.type === "tweets" ? "Tweet" : "Mention"} sync complete
+                    </p>
+                    <div className="flex gap-4 text-muted-foreground text-xs">
+                      <span>Added: {contentSyncResult.added}</span>
+                      <span>Skipped: {contentSyncResult.skipped}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
           )}
 
           <div className="flex items-center justify-between rounded-lg border p-4">

@@ -1,5 +1,5 @@
-import type { NewContact, NewContactIdentity } from "@/lib/db/types";
-import type { XUser } from "@/lib/platforms/x/client";
+import type { NewContact, NewContactIdentity, NewContentItem, NewContentPost } from "@/lib/db/types";
+import type { XUser, XTweet } from "@/lib/platforms/x/client";
 
 /** Split a display name into firstName/lastName. */
 function splitName(name: string): { firstName: string; lastName: string } {
@@ -57,5 +57,78 @@ export function mapXUserToIdentity(
     isPrimary: 1,
     isActive: 1,
     lastSyncedAt: Math.floor(Date.now() / 1000),
+  };
+}
+
+/** Parse an ISO date string to unix epoch seconds. */
+function isoToUnix(iso: string | undefined): number | null {
+  if (!iso) return null;
+  const ms = Date.parse(iso);
+  return isNaN(ms) ? null : Math.floor(ms / 1000);
+}
+
+/** Map an X tweet to a content_item row. */
+export function mapXTweetToContentItem(
+  tweet: XTweet,
+  accountId: string,
+  origin: "authored" | "received"
+): Omit<NewContentItem, "id"> {
+  const isReply = tweet.text.startsWith("@");
+  return {
+    body: tweet.text,
+    contentType: isReply ? ("reply" as const) : ("post" as const),
+    status: "imported" as const,
+    origin,
+    direction: origin === "authored" ? ("outbound" as const) : ("inbound" as const),
+    platformAccountId: accountId,
+    platformData: JSON.stringify({
+      authorId: tweet.author_id,
+      publicMetrics: tweet.public_metrics,
+    }),
+    createdAt: isoToUnix(tweet.created_at) ?? Math.floor(Date.now() / 1000),
+    updatedAt: Math.floor(Date.now() / 1000),
+  };
+}
+
+/** Map an X tweet to a content_post row (published platform instance). */
+export function mapXTweetToContentPost(
+  tweet: XTweet,
+  accountId: string
+): Omit<NewContentPost, "id" | "contentItemId"> {
+  const metrics = tweet.public_metrics;
+  return {
+    platformAccountId: accountId,
+    platformPostId: tweet.id,
+    platformUrl: `https://x.com/i/status/${tweet.id}`,
+    publishedAt: isoToUnix(tweet.created_at),
+    status: "imported" as const,
+    engagementSnapshot: JSON.stringify({
+      likes: metrics?.like_count ?? 0,
+      retweets: metrics?.retweet_count ?? 0,
+      replies: metrics?.reply_count ?? 0,
+      quotes: metrics?.quote_count ?? 0,
+    }),
+  };
+}
+
+/** Extract structured engagement metrics from a tweet. */
+export function extractTweetMetrics(tweet: XTweet): {
+  likes: number;
+  comments: number;
+  shares: number;
+  retweets: number;
+  quotes: number;
+  bookmarks: number;
+  impressions: number;
+} {
+  const m = tweet.public_metrics;
+  return {
+    likes: m?.like_count ?? 0,
+    comments: m?.reply_count ?? 0,
+    shares: m?.retweet_count ?? 0,
+    retweets: m?.retweet_count ?? 0,
+    quotes: m?.quote_count ?? 0,
+    bookmarks: 0, // not available in basic tweet fields
+    impressions: 0, // requires tweet.fields=non_public_metrics (oauth user context)
   };
 }

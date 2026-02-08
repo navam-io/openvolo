@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPlatformAccountByPlatform } from "@/lib/db/queries/platform-accounts";
+import { listSyncCursors } from "@/lib/db/queries/sync";
 import { syncContactsFromPlatform } from "@/lib/platforms/sync-contacts";
+import { syncTweetsFromX, syncMentionsFromX } from "@/lib/platforms/sync-content";
 import { TierRestrictedError } from "@/lib/platforms/x/client";
 import { decrypt } from "@/lib/auth/crypto";
 import type { PlatformCredentials } from "@/lib/platforms/adapter";
 
 /**
  * POST /api/platforms/x/sync
- * Trigger a contact sync from X (imports following list).
- * Requires follows.read scope (Basic+ tier).
+ * Trigger a sync from X.
+ * Body: { type: "contacts" | "tweets" | "mentions" }
+ *   - contacts: imports following list (requires follows.read, Basic+ tier)
+ *   - tweets: imports user's own tweets (requires tweet.read, Free tier)
+ *   - mentions: imports mentions of user (requires tweet.read, Free tier)
  */
 export async function POST(req: NextRequest) {
   try {
@@ -27,38 +32,53 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check if the account has follows.read scope
-    if (account.credentialsEncrypted) {
-      try {
-        const creds: PlatformCredentials = JSON.parse(decrypt(account.credentialsEncrypted));
-        if (!creds.grantedScopes?.includes("follows.read")) {
-          return NextResponse.json(
-            {
-              error: "Contact sync requires the follows.read scope. Click \"Enable Contact Sync\" to upgrade permissions (requires X API Basic tier, $200/mo).",
-              code: "TIER_RESTRICTED",
-            },
-            { status: 403 }
-          );
+    const body = await req.json().catch(() => ({}));
+    const syncType = body.type || "contacts";
+
+    // Route to the appropriate sync handler
+    switch (syncType) {
+      case "tweets": {
+        // tweet.read is available on Free tier
+        const result = await syncTweetsFromX(account.id, { maxPages: body.maxPages ?? 5 });
+        return NextResponse.json({ success: true, result });
+      }
+
+      case "mentions": {
+        // tweet.read is available on Free tier
+        const result = await syncMentionsFromX(account.id, { maxPages: body.maxPages ?? 5 });
+        return NextResponse.json({ success: true, result });
+      }
+
+      case "contacts":
+      default: {
+        // Contact sync requires follows.read scope (Basic+ tier)
+        if (account.credentialsEncrypted) {
+          try {
+            const creds: PlatformCredentials = JSON.parse(decrypt(account.credentialsEncrypted));
+            if (!creds.grantedScopes?.includes("follows.read")) {
+              return NextResponse.json(
+                {
+                  error: "Contact sync requires the follows.read scope. Click \"Enable Contact Sync\" to upgrade permissions (requires X API Basic tier, $200/mo).",
+                  code: "TIER_RESTRICTED",
+                },
+                { status: 403 }
+              );
+            }
+          } catch {
+            // If we can't read credentials, let the sync attempt proceed and fail naturally
+          }
         }
-      } catch {
-        // If we can't read credentials, let the sync attempt proceed and fail naturally
+
+        const maxPages = body.type === "delta" ? 2 : 10;
+        const result = await syncContactsFromPlatform(account.id, { maxPages });
+        return NextResponse.json({ success: true, result });
       }
     }
-
-    const body = await req.json().catch(() => ({}));
-    const maxPages = body.type === "delta" ? 2 : 10;
-
-    const result = await syncContactsFromPlatform(account.id, { maxPages });
-
-    return NextResponse.json({
-      success: true,
-      result,
-    });
   } catch (error) {
     if (error instanceof TierRestrictedError) {
       return NextResponse.json(
         {
-          error: "Contact sync requires X API Basic tier ($200/mo). Your current plan doesn't include access to the follows endpoint.",
+          error: "This sync requires a higher X API tier. Check your X Developer Portal settings.",
           code: "TIER_RESTRICTED",
         },
         { status: 403 }
@@ -71,7 +91,7 @@ export async function POST(req: NextRequest) {
 
 /**
  * GET /api/platforms/x/sync
- * Get sync status/stats for the X account.
+ * Get sync status/stats for the X account, including per-type cursors.
  */
 export async function GET() {
   const account = getPlatformAccountByPlatform("x");
@@ -79,9 +99,28 @@ export async function GET() {
     return NextResponse.json({ synced: false });
   }
 
+  // Get sync cursors for detailed per-type status
+  const cursors = listSyncCursors(account.id);
+  const cursorMap: Record<string, {
+    status: string;
+    totalSynced: number;
+    lastSyncedAt: number | null;
+    lastError: string | null;
+  }> = {};
+
+  for (const c of cursors) {
+    cursorMap[c.dataType] = {
+      status: c.syncStatus,
+      totalSynced: c.totalItemsSynced,
+      lastSyncedAt: c.lastSyncCompletedAt,
+      lastError: c.lastError,
+    };
+  }
+
   return NextResponse.json({
     synced: !!account.lastSyncedAt,
     lastSyncedAt: account.lastSyncedAt,
     status: account.status,
+    cursors: cursorMap,
   });
 }

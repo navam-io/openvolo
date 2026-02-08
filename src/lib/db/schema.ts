@@ -149,23 +149,36 @@ export const campaignContacts = sqliteTable("campaign_contacts", {
 
 export const contentItems = sqliteTable("content_items", {
   id: text("id").primaryKey(),
-  title: text("title").notNull(),
+  title: text("title"), // nullable — tweets/DMs have no title
   body: text("body"),
   contentType: text("content_type", {
-    enum: ["post", "article", "thread", "reply", "image", "video"],
+    enum: ["post", "article", "thread", "reply", "image", "video", "email", "dm", "newsletter"],
   }).notNull(),
   platformTarget: text("platform_target"),
   mediaPaths: text("media_paths").default("[]"), // JSON array of local paths
   status: text("status", {
-    enum: ["draft", "review", "approved", "scheduled", "published"],
+    enum: ["draft", "review", "approved", "scheduled", "published", "imported"],
   })
     .notNull()
     .default("draft"),
   aiGenerated: integer("ai_generated", { mode: "boolean" }).notNull().default(false),
   generationPrompt: text("generation_prompt"),
   scheduledAt: integer("scheduled_at"),
+  // Phase 2 additions
+  origin: text("origin", { enum: ["authored", "received", "imported"] }),
+  direction: text("direction", { enum: ["inbound", "outbound"] }),
+  platformAccountId: text("platform_account_id").references(() => platformAccounts.id),
+  threadId: text("thread_id"), // groups threaded content
+  parentItemId: text("parent_item_id"), // self-reference for replies
+  contactId: text("contact_id").references(() => contacts.id), // associated contact
+  platformData: text("platform_data").default("{}"), // JSON — raw platform-specific data
   ...timestamps,
-});
+}, (table) => [
+  index("idx_content_items_type").on(table.contentType),
+  index("idx_content_items_status").on(table.status),
+  index("idx_content_items_origin").on(table.origin),
+  index("idx_content_items_account").on(table.platformAccountId),
+]);
 
 // --- Content Posts (published instances) ---
 
@@ -181,20 +194,21 @@ export const contentPosts = sqliteTable("content_posts", {
   platformUrl: text("platform_url"),
   publishedAt: integer("published_at"),
   status: text("status", {
-    enum: ["scheduled", "publishing", "published", "failed"],
+    enum: ["scheduled", "publishing", "published", "failed", "imported"],
   })
     .notNull()
     .default("scheduled"),
   engagementSnapshot: text("engagement_snapshot").default("{}"), // JSON
-});
+}, (table) => [
+  uniqueIndex("idx_content_posts_platform_id").on(table.platformPostId, table.platformAccountId),
+]);
 
 // --- Engagements ---
 
 export const engagements = sqliteTable("engagements", {
   id: text("id").primaryKey(),
   contactId: text("contact_id")
-    .notNull()
-    .references(() => contacts.id, { onDelete: "cascade" }),
+    .references(() => contacts.id, { onDelete: "cascade" }), // nullable for anonymous engagement
   platformAccountId: text("platform_account_id").references(() => platformAccounts.id),
   engagementType: text("engagement_type", {
     enum: [
@@ -206,16 +220,35 @@ export const engagements = sqliteTable("engagements", {
       "follow",
       "view",
       "reply",
+      "retweet",
+      "quote",
+      "bookmark",
+      "impression",
+      "click",
+      "open",
+      "restack",
+      "reaction",
     ],
   }).notNull(),
   direction: text("direction", { enum: ["inbound", "outbound"] }).notNull(),
   content: text("content"),
   campaignId: text("campaign_id").references(() => campaigns.id),
   agentRunId: text("agent_run_id"),
+  // Phase 2 additions
+  contentPostId: text("content_post_id").references(() => contentPosts.id),
+  platform: text("platform", { enum: ["x", "linkedin", "gmail", "substack"] }),
+  platformEngagementId: text("platform_engagement_id"), // dedup key
+  threadId: text("thread_id"),
+  source: text("source"), // e.g. "timeline", "notification", "search"
+  platformData: text("platform_data").default("{}"), // JSON
   createdAt: integer("created_at")
     .notNull()
     .default(sql`(unixepoch())`),
-});
+}, (table) => [
+  index("idx_engagements_contact").on(table.contactId),
+  index("idx_engagements_content_post").on(table.contentPostId),
+  index("idx_engagements_platform_id").on(table.platformEngagementId),
+]);
 
 // --- Tasks ---
 
@@ -290,6 +323,60 @@ export const agentSteps = sqliteTable("agent_steps", {
     .notNull()
     .default(sql`(unixepoch())`),
 });
+
+// --- Sync Cursors (pagination state for platform imports) ---
+
+export const syncCursors = sqliteTable("sync_cursors", {
+  id: text("id").primaryKey(),
+  platformAccountId: text("platform_account_id")
+    .notNull()
+    .references(() => platformAccounts.id, { onDelete: "cascade" }),
+  dataType: text("data_type", {
+    enum: ["tweets", "mentions", "followers", "following", "dms", "likes"],
+  }).notNull(),
+  cursor: text("cursor"), // platform pagination token
+  oldestFetchedAt: integer("oldest_fetched_at"), // oldest item timestamp fetched
+  newestFetchedAt: integer("newest_fetched_at"), // newest item timestamp fetched
+  totalItemsSynced: integer("total_items_synced").notNull().default(0),
+  syncStatus: text("sync_status", {
+    enum: ["idle", "syncing", "completed", "failed"],
+  })
+    .notNull()
+    .default("idle"),
+  syncProgress: text("sync_progress"), // JSON — { current, total, message }
+  syncDirection: text("sync_direction", { enum: ["forward", "backward"] })
+    .notNull()
+    .default("backward"), // backward = fetch older, forward = fetch newer
+  lastSyncStartedAt: integer("last_sync_started_at"),
+  lastSyncCompletedAt: integer("last_sync_completed_at"),
+  lastError: text("last_error"),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex("idx_sync_cursor_account_type").on(table.platformAccountId, table.dataType),
+]);
+
+// --- Engagement Metrics (time-series snapshots) ---
+
+export const engagementMetrics = sqliteTable("engagement_metrics", {
+  id: text("id").primaryKey(),
+  contentPostId: text("content_post_id")
+    .notNull()
+    .references(() => contentPosts.id, { onDelete: "cascade" }),
+  snapshotAt: integer("snapshot_at")
+    .notNull()
+    .default(sql`(unixepoch())`),
+  likes: integer("likes").notNull().default(0),
+  comments: integer("comments").notNull().default(0),
+  shares: integer("shares").notNull().default(0),
+  impressions: integer("impressions").notNull().default(0),
+  clicks: integer("clicks").notNull().default(0),
+  bookmarks: integer("bookmarks").notNull().default(0),
+  quotes: integer("quotes").notNull().default(0),
+  retweets: integer("retweets").notNull().default(0),
+}, (table) => [
+  index("idx_engagement_metrics_post").on(table.contentPostId),
+  index("idx_engagement_metrics_snapshot").on(table.snapshotAt),
+]);
 
 // --- Scheduled Jobs ---
 
