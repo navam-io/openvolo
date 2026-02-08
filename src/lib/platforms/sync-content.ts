@@ -87,7 +87,9 @@ export async function syncTweetsFromX(
     const errorMessage = err instanceof Error ? err.message : String(err);
     result.errors.push(`Tweet sync failed: ${errorMessage}`);
     updateSyncCursor(cursor.id, {
-      syncStatus: "failed",
+      syncStatus: result.added > 0 ? "completed" : "failed",
+      lastSyncCompletedAt: Math.floor(Date.now() / 1000),
+      totalItemsSynced: cursor.totalItemsSynced + result.added,
       lastError: errorMessage,
     });
   }
@@ -170,7 +172,9 @@ export async function syncMentionsFromX(
     const errorMessage = err instanceof Error ? err.message : String(err);
     result.errors.push(`Mention sync failed: ${errorMessage}`);
     updateSyncCursor(cursor.id, {
-      syncStatus: "failed",
+      syncStatus: result.added > 0 ? "completed" : "failed",
+      lastSyncCompletedAt: Math.floor(Date.now() / 1000),
+      totalItemsSynced: cursor.totalItemsSynced + result.added,
       lastError: errorMessage,
     });
   }
