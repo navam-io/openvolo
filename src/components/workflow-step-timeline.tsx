@@ -1,4 +1,7 @@
+"use client";
+
 import { Badge } from "@/components/ui/badge";
+import { StepOutputRenderer } from "@/components/step-output-renderer";
 import {
   Globe,
   Monitor,
@@ -142,12 +145,7 @@ export function WorkflowStepTimeline({ steps, animate }: { steps: WorkflowStep[]
                 );
               })()}
               {output && Object.keys(output).length > 0 && !step.error && (
-                <p className="text-xs text-muted-foreground">
-                  {Object.entries(output)
-                    .filter(([, v]) => v !== undefined && v !== null && v !== 0)
-                    .map(([k, v]) => `${k}: ${v}`)
-                    .join(", ")}
-                </p>
+                <StepOutputRenderer output={output} variant="inline" />
               )}
             </div>
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { StepOutputRenderer } from "@/components/step-output-renderer";
 import {
   Globe,
   Monitor,
@@ -170,9 +171,7 @@ function GraphNode({ step, isLast }: { step: WorkflowStep; isLast: boolean }) {
               {output && !step.error && (
                 <div>
                   <span className="text-[10px] font-medium text-muted-foreground">Output</span>
-                  <pre className="text-[10px] font-mono bg-muted rounded p-2 overflow-x-auto max-h-[120px]">
-                    {JSON.stringify(output, null, 2)}
-                  </pre>
+                  <StepOutputRenderer output={output} variant="block" />
                 </div>
               )}
             </div>
