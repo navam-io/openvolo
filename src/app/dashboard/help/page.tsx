@@ -28,6 +28,8 @@ import {
   RefreshCw,
   UserPlus,
   Key,
+  Mail,
+  FileDown,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -47,6 +49,7 @@ interface ChecklistState {
   xConnected: boolean;
   xSynced: boolean;
   linkedinConnected: boolean;
+  gmailConnected: boolean;
 }
 
 function useSetupChecklist(): ChecklistState {
@@ -56,6 +59,7 @@ function useSetupChecklist(): ChecklistState {
     xConnected: false,
     xSynced: false,
     linkedinConnected: false,
+    gmailConnected: false,
   });
 
   useEffect(() => {
@@ -69,13 +73,17 @@ function useSetupChecklist(): ChecklistState {
       fetch("/api/platforms/linkedin")
         .then((r) => r.json())
         .catch(() => ({ connected: false })),
-    ]).then(([settings, xStatus, linkedinStatus]) => {
+      fetch("/api/platforms/gmail")
+        .then((r) => r.json())
+        .catch(() => ({ connected: false })),
+    ]).then(([settings, xStatus, linkedinStatus, gmailStatus]) => {
       setState({
         loading: false,
         anthropicKey: settings.source !== "none",
         xConnected: xStatus.connected === true,
         xSynced: xStatus.account?.lastSyncedAt != null,
         linkedinConnected: linkedinStatus.connected === true,
+        gmailConnected: gmailStatus.connected === true,
       });
     });
   }, []);
@@ -159,7 +167,7 @@ function GettingStartedTab() {
             Welcome to OpenVolo
           </CardTitle>
           <CardDescription>
-            AI-Native Social CRM for X/Twitter + LinkedIn
+            AI-Native Social CRM for X/Twitter + LinkedIn + Gmail
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3 text-sm text-muted-foreground">
@@ -217,6 +225,12 @@ function GettingStartedTab() {
             href="/dashboard/settings"
           />
           <ChecklistItem
+            label="Gmail / Google account connected"
+            done={checklist.gmailConnected}
+            loading={checklist.loading}
+            href="/dashboard/settings"
+          />
+          <ChecklistItem
             label="First contact sync completed"
             done={checklist.xSynced}
             loading={checklist.loading}
@@ -245,7 +259,9 @@ function GettingStartedTab() {
 X_CLIENT_ID="your-oauth2-client-id"
 X_CLIENT_SECRET="your-oauth2-client-secret"
 LINKEDIN_CLIENT_ID="your-linkedin-client-id"
-LINKEDIN_CLIENT_SECRET="your-linkedin-client-secret"`}</CodeBlock>
+LINKEDIN_CLIENT_SECRET="your-linkedin-client-secret"
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"`}</CodeBlock>
           <p className="text-xs text-muted-foreground">
             The Anthropic key can also be set via the{" "}
             <Link
@@ -254,7 +270,7 @@ LINKEDIN_CLIENT_SECRET="your-linkedin-client-secret"`}</CodeBlock>
             >
               Settings
             </Link>{" "}
-            page. X and LinkedIn credentials must be set as environment
+            page. X, LinkedIn, and Google credentials must be set as environment
             variables.
           </p>
         </CardContent>
@@ -617,6 +633,294 @@ LINKEDIN_CLIENT_SECRET="your-linkedin-client-secret"`}</CodeBlock>
           </ol>
         </CardContent>
       </Card>
+
+      {/* CSV Import Alternative */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileDown className="h-5 w-5" />
+            Alternative: Import via CSV (No API Required)
+          </CardTitle>
+          <CardDescription>
+            Import LinkedIn connections from a data export — works without a
+            connected LinkedIn account.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <ol className="list-decimal pl-5 space-y-2">
+            <li>
+              On LinkedIn, go to{" "}
+              <strong className="text-foreground">
+                Settings &amp; Privacy
+              </strong>{" "}
+              &rarr;{" "}
+              <strong className="text-foreground">Data Privacy</strong> &rarr;{" "}
+              <strong className="text-foreground">
+                Get a copy of your data
+              </strong>
+            </li>
+            <li>
+              Select <strong className="text-foreground">Connections</strong>{" "}
+              only and request the archive
+            </li>
+            <li>
+              Download the CSV when LinkedIn emails the link (usually within 10
+              minutes)
+            </li>
+            <li>
+              In OpenVolo{" "}
+              <Link
+                href="/dashboard/settings"
+                className="text-primary underline underline-offset-2"
+              >
+                Settings
+              </Link>
+              , scroll to{" "}
+              <strong className="text-foreground">LinkedIn CSV Import</strong>,
+              click{" "}
+              <strong className="text-foreground">Import CSV</strong>, and
+              select the downloaded file
+            </li>
+          </ol>
+          <div className="rounded-lg border bg-muted/50 p-3 text-xs">
+            <strong className="text-foreground">Note:</strong> The CSV includes
+            name, company, position, connected date, and email (if the
+            connection shared it). No LinkedIn API access is needed.
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function GmailSetupTab() {
+  return (
+    <div className="space-y-6">
+      {/* Prerequisites */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Prerequisites
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <ul className="list-disc pl-5 space-y-1">
+            <li>
+              A Google Cloud Console account at{" "}
+              <span className="text-primary font-medium">
+                console.cloud.google.com
+              </span>
+            </li>
+            <li>
+              OAuth consent screen configured (can be in &ldquo;Testing&rdquo;
+              mode)
+            </li>
+            <li>
+              <strong className="text-foreground">People API</strong> and{" "}
+              <strong className="text-foreground">Gmail API</strong> enabled on
+              your project
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      {/* Step 1 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <StepNumber n={1} />
+            Create Google Cloud Project
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <ol className="list-decimal pl-5 space-y-2">
+            <li>
+              Go to{" "}
+              <span className="text-primary font-medium">
+                console.cloud.google.com
+              </span>{" "}
+              and sign in
+            </li>
+            <li>Create a new project (or select an existing one)</li>
+            <li>
+              Navigate to{" "}
+              <strong className="text-foreground">
+                APIs &amp; Services
+              </strong>{" "}
+              &rarr;{" "}
+              <strong className="text-foreground">Library</strong>
+            </li>
+            <li>
+              Search for and enable{" "}
+              <strong className="text-foreground">People API</strong> and{" "}
+              <strong className="text-foreground">Gmail API</strong>
+            </li>
+          </ol>
+          <div className="rounded-lg border bg-muted/50 p-3 text-xs">
+            <strong className="text-foreground">Note:</strong> Both APIs must be
+            enabled — People API for contact import, Gmail API for email metadata
+            enrichment.
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Step 2 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <StepNumber n={2} />
+            Configure OAuth Consent Screen
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <ol className="list-decimal pl-5 space-y-2">
+            <li>
+              Go to{" "}
+              <strong className="text-foreground">
+                APIs &amp; Services
+              </strong>{" "}
+              &rarr;{" "}
+              <strong className="text-foreground">
+                OAuth consent screen
+              </strong>
+            </li>
+            <li>
+              Choose <Code>External</Code> user type (or Internal for Workspace
+              accounts)
+            </li>
+            <li>Set app name, user support email, and developer email</li>
+            <li>
+              Add scopes:{" "}
+              <Code>contacts.readonly</Code> and{" "}
+              <Code>gmail.readonly</Code>
+            </li>
+            <li>
+              If in <strong className="text-foreground">Testing</strong> mode,
+              add your Google account as a test user
+            </li>
+          </ol>
+        </CardContent>
+      </Card>
+
+      {/* Step 3 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <StepNumber n={3} />
+            Create OAuth Credentials
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <ol className="list-decimal pl-5 space-y-2">
+            <li>
+              Go to{" "}
+              <strong className="text-foreground">
+                APIs &amp; Services
+              </strong>{" "}
+              &rarr;{" "}
+              <strong className="text-foreground">Credentials</strong>
+            </li>
+            <li>
+              Click{" "}
+              <strong className="text-foreground">
+                Create Credentials
+              </strong>{" "}
+              &rarr;{" "}
+              <strong className="text-foreground">OAuth client ID</strong>
+            </li>
+            <li>
+              Application type:{" "}
+              <Code>Web application</Code>
+            </li>
+            <li>
+              Add authorized redirect URI:
+              <CodeBlock>
+                http://localhost:3000/api/platforms/gmail/callback
+              </CodeBlock>
+            </li>
+            <li>
+              Copy the{" "}
+              <strong className="text-foreground">Client ID</strong> and{" "}
+              <strong className="text-foreground">Client Secret</strong>
+            </li>
+          </ol>
+        </CardContent>
+      </Card>
+
+      {/* Step 4 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <StepNumber n={4} />
+            Configure OpenVolo
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm text-muted-foreground">
+          <p>
+            Add the Google credentials to your <Code>.env.local</Code>:
+          </p>
+          <CodeBlock>{`GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"`}</CodeBlock>
+          <p>
+            Restart the dev server (<Code>npm run dev</Code>) to pick up the new
+            variables.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Step 5 */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <StepNumber n={5} />
+            Connect &amp; Sync
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <ol className="list-decimal pl-5 space-y-2">
+            <li>
+              Go to{" "}
+              <Link
+                href="/dashboard/settings"
+                className="text-primary underline underline-offset-2"
+              >
+                Settings
+              </Link>{" "}
+              &rarr; Platform Connections &rarr; Click{" "}
+              <strong className="text-foreground">Connect</strong> on Gmail
+            </li>
+            <li>Authorize OpenVolo on your Google account</li>
+            <li>
+              Click{" "}
+              <strong className="text-foreground">Sync Now</strong> to import
+              Google contacts via the People API
+            </li>
+            <li>
+              Click{" "}
+              <strong className="text-foreground">Sync Metadata</strong> to
+              enrich contacts with email frequency data (sent/received counts in
+              last 30 days, last message date)
+            </li>
+            <li>
+              Contacts appear in{" "}
+              <Link
+                href="/dashboard/contacts"
+                className="text-primary underline underline-offset-2"
+              >
+                Contacts
+              </Link>{" "}
+              with Gmail identity badges and enrichment scores
+            </li>
+          </ol>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">
+            If your app is in &ldquo;Testing&rdquo; mode, you will see an
+            &ldquo;unverified app&rdquo; warning. Click{" "}
+            <strong>Advanced</strong> &rarr;{" "}
+            <strong>Go to OpenVolo (unsafe)</strong> to proceed.
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -717,6 +1021,31 @@ function FeaturesTab() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Gmail / Google
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm text-muted-foreground">
+          <ul className="list-disc pl-5 space-y-1">
+            <li>Imports contacts from Google Contacts (People API)</li>
+            <li>
+              Email metadata enrichment: sent/received counts in last 30 days
+              and last interaction date
+            </li>
+            <li>
+              Cross-platform dedup with X and LinkedIn contacts
+            </li>
+            <li>
+              No email content is stored — only metadata (message counts and
+              dates)
+            </li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
             <ListChecks className="h-5 w-5" />
             Tasks
           </CardTitle>
@@ -791,7 +1120,17 @@ function FaqTab() {
     {
       icon: Sparkles,
       q: "How does cross-platform enrichment work?",
-      a: "Contacts matched across X and LinkedIn get a +10 enrichment score bonus for having multiple platform identities. LinkedIn also contributes up to +15 points from professional fields like headline, company, and title.",
+      a: "Contacts matched across X, LinkedIn, and Gmail get a +10 enrichment score bonus for having multiple platform identities. LinkedIn also contributes up to +15 points from professional fields like headline, company, and title.",
+    },
+    {
+      icon: Mail,
+      q: "What Google APIs do I need?",
+      a: "People API (for importing Google contacts) and Gmail API (for email metadata enrichment). Both must be enabled in your Google Cloud Console project under APIs & Services.",
+    },
+    {
+      icon: Mail,
+      q: "What does Gmail metadata sync do?",
+      a: "Enriches contacts with email frequency data — sent and received message counts in the last 30 days, plus the last message date. No email content is read or stored, only aggregate metadata.",
     },
     {
       icon: UserPlus,
@@ -836,7 +1175,7 @@ function FaqTab() {
 
 // ─── Main Content ────────────────────────────────────────────────────────────
 
-const VALID_TABS = ["getting-started", "x-setup", "linkedin-setup", "features", "faq"] as const;
+const VALID_TABS = ["getting-started", "x-setup", "linkedin-setup", "gmail-setup", "features", "faq"] as const;
 type TabValue = (typeof VALID_TABS)[number];
 
 function HelpContent() {
@@ -870,6 +1209,10 @@ function HelpContent() {
             <Linkedin className="h-4 w-4" />
             LinkedIn Setup
           </TabsTrigger>
+          <TabsTrigger value="gmail-setup">
+            <Mail className="h-4 w-4" />
+            Gmail Setup
+          </TabsTrigger>
           <TabsTrigger value="features">
             <LayoutList className="h-4 w-4" />
             Features
@@ -888,6 +1231,9 @@ function HelpContent() {
         </TabsContent>
         <TabsContent value="linkedin-setup">
           <LinkedInSetupTab />
+        </TabsContent>
+        <TabsContent value="gmail-setup">
+          <GmailSetupTab />
         </TabsContent>
         <TabsContent value="features">
           <FeaturesTab />
