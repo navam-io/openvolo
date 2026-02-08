@@ -639,7 +639,7 @@ const platformLabels: Record<string, string> = {
 
 ## 12. API Validation
 
-Zod schemas for contact and campaign creation validate platform against the
+Zod schemas for contact and workflow template creation validate platform against the
 4-channel enum:
 
 ```typescript

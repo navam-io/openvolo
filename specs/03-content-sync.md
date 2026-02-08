@@ -247,7 +247,7 @@ Existing columns are already sufficient for imported content: `platformPostId`,
 | `platform` | text | (required) | Denormalized platform for fast filtering |
 | `platformEngagementId` | text nullable | null | Dedup key from platform |
 | `threadId` | text nullable | null | Conversation grouping |
-| `source` | text enum | `"manual"` | `manual`, `campaign`, `imported`, `agent` |
+| `source` | text enum | — | Free-text source indicator (e.g., `"timeline"`, `"notification"`, `"search"`) |
 | `platformData` | text | `"{}"` | Raw platform-specific JSON |
 
 ### 2.5 `engagements` — Modify Existing
@@ -331,17 +331,15 @@ export const engagements = sqliteTable("engagements", {
   }).notNull(),
   direction: text("direction", { enum: ["inbound", "outbound"] }).notNull(),
   content: text("content"),
-  campaignId: text("campaign_id").references(() => campaigns.id),
-  agentRunId: text("agent_run_id"),
+  templateId: text("template_id").references(() => workflowTemplates.id),
+  workflowRunId: text("workflow_run_id").references(() => workflowRuns.id),
   // New columns for engagement sync
   contentPostId: text("content_post_id")
     .references(() => contentPosts.id),
   platform: text("platform", { enum: ["x", "linkedin", "gmail", "substack"] }),
   platformEngagementId: text("platform_engagement_id"),
   threadId: text("thread_id"),
-  source: text("source", { enum: ["manual", "campaign", "imported", "agent"] })
-    .notNull()
-    .default("manual"),
+  source: text("source"), // e.g. "timeline", "notification", "search"
   platformData: text("platform_data").default("{}"),
   createdAt: integer("created_at")
     .notNull()
@@ -905,9 +903,9 @@ Existing data needs default values for new columns:
 UPDATE content_items SET origin = 'authored' WHERE origin IS NULL;
 UPDATE content_items SET direction = 'outbound' WHERE direction IS NULL;
 
--- Existing engagements are manual or campaign-sourced
-UPDATE engagements SET source = 'manual' WHERE source IS NULL AND campaign_id IS NULL;
-UPDATE engagements SET source = 'campaign' WHERE source IS NULL AND campaign_id IS NOT NULL;
+-- Existing engagements get a default source
+UPDATE engagements SET source = 'manual' WHERE source IS NULL AND template_id IS NULL;
+UPDATE engagements SET source = 'workflow' WHERE source IS NULL AND template_id IS NOT NULL;
 ```
 
 ### 11.3 New Query Files

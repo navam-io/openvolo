@@ -123,8 +123,9 @@ className="animate-fade-slide-in"
 
 - **Glass effect**: `bg-sidebar/30 backdrop-blur-sm` + `border-r border-sidebar-border`
 - **Header**: Logo (32x32 `rounded-lg`) + gradient brand text
-- **Navigation items**: Dashboard, Contacts, Campaigns, Content, Agents, Workflows
+- **Navigation items**: Dashboard, Contacts, Content, Workflows
 - **Footer items**: Settings, Help
+- **Removed**: Campaigns and Agents (consolidated into Workflows — see [`specs/06-unified-workflows.md`](./06-unified-workflows.md))
 - **Active state**: `border-l-2 border-primary bg-primary/8 text-primary font-display font-medium`
 - **Transition**: `transition-all duration-200`
 - **Responsive**: Collapses to trigger button on mobile via `SidebarProvider`
@@ -146,7 +147,7 @@ className="animate-fade-slide-in"
    - Gradient background wash: `bg-gradient-to-br from-chart-N/10 to-chart-N/5`
    - Icon in circular container: `rounded-full p-2 bg-chart-N/15 text-chart-N`
    - Animated counters + staggered entrance (80ms per card)
-   - Stats: Contacts (Users/chart-1), Campaigns (Megaphone/chart-3), Pending Tasks (CheckSquare/chart-2), Content (FileText/chart-4)
+   - Stats: Contacts (Users/chart-1), Active Workflows (GitBranch/chart-3), Pending Tasks (CheckSquare/chart-2), Content (FileText/chart-4)
 3. **Contact Pipeline** — `FunnelVisualization`: horizontal stacked bar (h-4 rounded-full) + color legend
 4. **Activity Grid** — 2-column: Recent Contacts (with FunnelStageBadge) + Pending Tasks (with PriorityBadge)
    - Row hover: `hover:bg-accent/30 transition-colors`
@@ -187,17 +188,32 @@ className="animate-fade-slide-in"
 3. **Browser Enrichment** — Session setup/validate/clear + bulk enrich button
 4. **Platform-specific sections**: X content sync, LinkedIn CSV import, Gmail metadata sync
 
+### Workflows (`/dashboard/workflows`)
+
+- Server-rendered hub page with `WorkflowQuickActions` for triggering sync/enrich
+- `WorkflowViewSwitcher` — 3-view client component with Tabs + URL param `?view=list|kanban|swimlane`
+- Empty state when no runs exist, populated by platform sync/enrich operations
+- View components: `WorkflowListView` (table), `WorkflowKanbanView` (4-column status board), `WorkflowSwimlaneView` (horizontal type lanes)
+
+### Workflow Detail (`/dashboard/workflows/[id]`)
+
+- **Summary cards** — Status, type, item counts (processed/success/skipped/error), duration
+- **Agent cards** — Model, token usage, cost in USD (shown for agent-type runs only)
+- **Step visualization** — `WorkflowDetailSteps` client component with Timeline/Graph toggle
+  - Timeline: `WorkflowStepTimeline` — chronological list with 15 step type icons
+  - Graph: `WorkflowGraphView` — vertical pipeline with expandable nodes (pure CSS)
+
 ### Placeholder Pages
 
-- Campaigns, Agents, Workflows, Help — shell pages with empty states, ready for Phase 3+
+- Help — shell page, ready for future content
 
 ## 8. Component Inventory
 
-### Custom Domain Components (18)
+### Custom Domain Components (26)
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `AppSidebar` | `app-sidebar.tsx` | Main navigation sidebar |
+| `AppSidebar` | `app-sidebar.tsx` | Main navigation sidebar (4 main + 2 footer items) |
 | `DashboardHeader` | `dashboard-header.tsx` | Sticky header with breadcrumb + theme toggle |
 | `DashboardGreeting` | `dashboard-greeting.tsx` | Time-based greeting message |
 | `AnimatedStat` | `animated-stat.tsx` | Counter animation (ease-out-cubic, 800ms) |
@@ -214,6 +230,15 @@ className="animate-fade-slide-in"
 | `TweetInput` | `tweet-input.tsx` | Auto-resize textarea with char counter |
 | `PaginationControls` | `pagination-controls.tsx` | Page navigation with windowed numbers |
 | `EmptyState` | `empty-state.tsx` | Centered icon + title + CTA |
+| `WorkflowProgressCard` | `workflow-progress-card.tsx` | Card with type icon (6 types), progress bar, stats |
+| `WorkflowStepTimeline` | `workflow-step-timeline.tsx` | Chronological step list (15 step types) with status/duration |
+| `WorkflowRunCard` | `workflow-run-card.tsx` | Compact card for kanban/swimlane (two layout variants) |
+| `WorkflowListView` | `workflow-list-view.tsx` | Table view with type, status, counts, duration columns |
+| `WorkflowKanbanView` | `workflow-kanban-view.tsx` | 4-column status board (Pending/Running/Completed/Failed) |
+| `WorkflowSwimlaneView` | `workflow-swimlane-view.tsx` | Horizontal lanes per workflow type with ScrollArea |
+| `WorkflowGraphView` | `workflow-graph-view.tsx` | Vertical pipeline with expandable step nodes (pure CSS) |
+| `WorkflowViewSwitcher` | `dashboard/workflows/workflow-view-switcher.tsx` | View mode tabs with URL param persistence |
+| `WorkflowDetailSteps` | `dashboard/workflows/[id]/workflow-detail-steps.tsx` | Timeline/Graph toggle for run detail |
 
 ### shadcn/ui Primitives (19)
 

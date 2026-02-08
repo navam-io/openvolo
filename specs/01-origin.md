@@ -95,10 +95,8 @@ openvolo/
 │   │   │   ├── layout.tsx        # Sidebar + content shell
 │   │   │   ├── page.tsx          # Dashboard home
 │   │   │   ├── contacts/         # Contact list + [id] detail
-│   │   │   ├── campaigns/        # Campaign list + [id] detail
 │   │   │   ├── content/          # Content list + [id] detail
-│   │   │   ├── agents/           # Agent list + [id] detail
-│   │   │   ├── workflows/        # Workflow builder
+│   │   │   ├── workflows/        # Workflow hub (list/kanban/swimlane views, [id] detail)
 │   │   │   └── settings/         # API key + platform config
 │   │   └── api/
 │   │       ├── settings/route.ts # GET/POST API key management
@@ -108,7 +106,7 @@ openvolo/
 │   │       └── cron/scheduler/   # (Phase 3)
 │   ├── lib/
 │   │   ├── db/
-│   │   │   ├── schema.ts         # 12 Drizzle table definitions
+│   │   │   ├── schema.ts         # 15 Drizzle table definitions
 │   │   │   ├── client.ts         # DB connection + exports
 │   │   │   ├── types.ts          # Drizzle-inferred TypeScript types
 │   │   │   ├── migrations/       # Generated SQL migrations
@@ -116,10 +114,10 @@ openvolo/
 │   │   ├── auth/
 │   │   │   ├── crypto.ts         # AES-256-GCM encrypt/decrypt
 │   │   │   └── claude-auth.ts    # API key save/get/validate/clear
-│   │   ├── agents/               # (Phase 3) Agent definitions
-│   │   ├── platforms/            # (Phase 1/4) Platform adapters
-│   │   ├── browser/              # (Phase 4) Browser automation
-│   │   └── ai/                   # (Phase 2) AI utilities
+│   │   ├── workflows/            # Workflow types, sync wrapper, run helpers
+│   │   ├── platforms/            # Platform adapters (x, linkedin, gmail)
+│   │   ├── browser/              # Browser enrichment (Playwright, anti-detection)
+│   │   └── ai/                   # AI utilities
 │   └── components/
 │       ├── app-sidebar.tsx       # Navigation sidebar
 │       ├── contact-form.tsx      # Reusable contact form
@@ -177,9 +175,9 @@ openvolo/
   Server Components. Claude Agent SDK handles autonomous multi-step agent runs with
   tool use and human-in-the-loop approvals. Supports both API keys and Claude Code
   Max/Pro subscriptions.
-- **Multi-agent coordination.** The `agent_runs` table tracks parent/child relationships
-  via `parent_run_id`, enabling orchestrator agents to spawn sub-agents for specialized
-  tasks (e.g., a campaign agent spawning individual outreach agents per contact).
+- **Unified workflow system.** The `workflow_runs` table tracks all operations — sync,
+  enrichment, search, prune, sequence, and agent runs — with parent/child relationships
+  via `parent_workflow_id`. See [`specs/06-unified-workflows.md`](./06-unified-workflows.md).
 - **Playwright for browser automation.** Session-based platform interactions that aren't
   possible via official APIs — profile scraping, cookie-authenticated actions, and
   visual page interaction. Located at `src/lib/browser/` (Phase 4).
@@ -235,15 +233,20 @@ The CLI is the primary entry point. `npx openvolo` runs the compiled version at
 
 **File:** `src/lib/db/schema.ts`
 
-12 tables organized into 7 domains. All IDs are text (nanoid). Timestamps are Unix epoch
+15 tables organized into 6 domains. All IDs are text (nanoid). Timestamps are Unix epoch
 seconds via `unixepoch()`. Foreign keys use cascade deletes where appropriate.
+
+> **Note:** The original Phase 0 schema had 12 tables including `campaigns`, `campaign_steps`,
+> `campaign_contacts`, `agent_runs`, and `agent_steps`. These were consolidated into the
+> unified workflow system — see [`specs/06-unified-workflows.md`](./06-unified-workflows.md)
+> for the complete current schema. The tables below document what remains from Phase 0
+> plus the key additions.
 
 **Connection:** `src/lib/db/client.ts` — creates a `better-sqlite3` instance with WAL
 journal mode and foreign keys enabled, wraps it with Drizzle ORM.
 
-**Initial migration:** `src/lib/db/migrations/0000_redundant_anita_blake.sql` — generated
-by `drizzle-kit generate`, contains CREATE TABLE statements for all 12 tables. Migration
-filenames follow the pattern `0000_<drizzle-generated-name>.sql`.
+**Schema sync:** `drizzle-kit push --force` is used on CLI startup (not `drizzle-kit migrate`).
+The DB has no migration journal.
 
 ### 5.1 Platform / Auth
 
@@ -288,17 +291,19 @@ filenames follow the pattern `0000_<drizzle-generated-name>.sql`.
 | created_at | integer | default `unixepoch()` |
 | updated_at | integer | default `unixepoch()` |
 
-### 5.3 Campaigns
+### 5.3 Workflow Templates (formerly Campaigns)
 
-#### `campaigns`
+> Full schema details in [`specs/06-unified-workflows.md`](./06-unified-workflows.md) Section 3.
+
+#### `workflow_templates`
 
 | Column | Type | Notes |
 |---|---|---|
 | id | text PK | |
 | name | text | not null |
 | description | text | |
-| platform | text | enum: `x`, `linkedin` |
-| campaign_type | text | enum: `outreach`, `engagement`, `content`, `nurture` — not null |
+| platform | text | enum: `x`, `linkedin`, `gmail`, `substack` |
+| template_type | text | enum: `outreach`, `engagement`, `content`, `nurture`, `prospecting`, `enrichment`, `pruning` — not null |
 | status | text | enum: `draft`, `active`, `paused`, `completed` — default `draft` |
 | config | text | JSON, default `{}` |
 | goal_metrics | text | JSON, default `{}` |
@@ -307,24 +312,25 @@ filenames follow the pattern `0000_<drizzle-generated-name>.sql`.
 | created_at | integer | default `unixepoch()` |
 | updated_at | integer | default `unixepoch()` |
 
-#### `campaign_steps`
+#### `workflow_template_steps`
 
 | Column | Type | Notes |
 |---|---|---|
 | id | text PK | |
-| campaign_id | text FK | → campaigns.id, cascade delete |
+| template_id | text FK | → workflow_templates.id, cascade delete |
 | step_index | integer | not null |
 | step_type | text | enum: `connect`, `message`, `follow`, `like`, `comment`, `wait`, `condition` |
 | config | text | JSON, default `{}` |
 | delay_hours | integer | default 0 |
 
-#### `campaign_contacts`
+#### `workflow_enrollments`
 
 | Column | Type | Notes |
 |---|---|---|
 | id | text PK | |
-| campaign_id | text FK | → campaigns.id, cascade delete |
+| template_id | text FK | → workflow_templates.id, cascade delete |
 | contact_id | text FK | → contacts.id, cascade delete |
+| workflow_run_id | text FK | → workflow_runs.id |
 | status | text | enum: `pending`, `active`, `completed`, `replied`, `removed` — default `pending` |
 | current_step_index | integer | default 0 |
 | enrolled_at | integer | default `unixepoch()` |
@@ -374,8 +380,8 @@ filenames follow the pattern `0000_<drizzle-generated-name>.sql`.
 | engagement_type | text | enum: `connection_request`, `message`, `like`, `comment`, `share`, `follow`, `view`, `reply` |
 | direction | text | enum: `inbound`, `outbound` |
 | content | text | |
-| campaign_id | text FK | → campaigns.id (nullable) |
-| agent_run_id | text | |
+| template_id | text FK | → workflow_templates.id (nullable) |
+| workflow_run_id | text FK | → workflow_runs.id (nullable) |
 | created_at | integer | default `unixepoch()` |
 
 ### 5.6 Tasks
@@ -392,44 +398,59 @@ filenames follow the pattern `0000_<drizzle-generated-name>.sql`.
 | priority | text | enum: `low`, `medium`, `high`, `urgent` — default `medium` |
 | assignee | text | enum: `user`, `agent` — default `user` |
 | related_contact_id | text FK | → contacts.id (nullable) |
-| related_campaign_id | text FK | → campaigns.id (nullable) |
+| related_template_id | text FK | → workflow_templates.id (nullable) |
 | due_at | integer | |
 | completed_at | integer | |
 | created_at | integer | default `unixepoch()` |
 | updated_at | integer | default `unixepoch()` |
 
-### 5.7 Agents / Jobs
+### 5.7 Workflow Runs & Steps / Jobs
 
-#### `agent_runs`
+> Full schema details in [`specs/06-unified-workflows.md`](./06-unified-workflows.md) Section 3.
+
+#### `workflow_runs`
 
 | Column | Type | Notes |
 |---|---|---|
 | id | text PK | |
-| agent_type | text | not null |
-| trigger | text | enum: `user`, `scheduled`, `campaign` — default `user` |
-| status | text | enum: `queued`, `running`, `completed`, `failed`, `cancelled` — default `queued` |
-| input | text | JSON, default `{}` |
-| output | text | JSON |
-| error | text | |
-| model | text | |
+| template_id | text FK | → workflow_templates.id (nullable) |
+| workflow_type | text | enum: `sync`, `enrich`, `search`, `prune`, `sequence`, `agent` — not null |
+| platform_account_id | text FK | → platform_accounts.id (nullable) |
+| status | text | enum: `pending`, `running`, `paused`, `completed`, `failed`, `cancelled` — default `pending` |
+| total_items | integer | |
+| processed_items | integer | default 0 |
+| success_items | integer | default 0 |
+| skipped_items | integer | default 0 |
+| error_items | integer | default 0 |
+| config | text | JSON, default `{}` |
+| result | text | JSON, default `{}` |
+| errors | text | JSON array, default `[]` |
+| trigger | text | enum: `user`, `scheduled`, `template` — default `user` |
+| model | text | AI model ID |
 | input_tokens | integer | default 0 |
 | output_tokens | integer | default 0 |
 | cost_usd | real | default 0 |
-| parent_run_id | text | subagent tracking |
+| parent_workflow_id | text | self-FK for sub-workflows |
 | started_at | integer | |
 | completed_at | integer | |
 | created_at | integer | default `unixepoch()` |
+| updated_at | integer | default `unixepoch()` |
 
-#### `agent_steps`
+#### `workflow_steps`
 
 | Column | Type | Notes |
 |---|---|---|
 | id | text PK | |
-| agent_run_id | text FK | → agent_runs.id, cascade delete |
+| workflow_run_id | text FK | → workflow_runs.id, cascade delete |
 | step_index | integer | not null |
-| step_type | text | enum: `thinking`, `tool_call`, `tool_result`, `decision`, `error` |
-| description | text | |
-| data | text | JSON |
+| step_type | text | 15 types across 3 categories (pipeline, agent, observability) |
+| status | text | enum: `pending`, `running`, `completed`, `failed`, `skipped` — default `pending` |
+| contact_id | text FK | → contacts.id (nullable) |
+| url | text | |
+| tool | text | |
+| input | text | JSON, default `{}` |
+| output | text | JSON, default `{}` |
+| error | text | |
 | duration_ms | integer | |
 | created_at | integer | default `unixepoch()` |
 
@@ -591,37 +612,37 @@ main area with `p-6` padding.
 
 **File:** `src/components/app-sidebar.tsx`
 
-7 navigation items (6 main + 1 footer):
+6 navigation items (4 main + 2 footer):
 
 | Item | Route | Icon | Position |
 |---|---|---|---|
 | Dashboard | `/dashboard` | LayoutDashboard | Main nav |
 | Contacts | `/dashboard/contacts` | Users | Main nav |
-| Campaigns | `/dashboard/campaigns` | Megaphone | Main nav |
 | Content | `/dashboard/content` | FileText | Main nav |
-| Agents | `/dashboard/agents` | Bot | Main nav |
 | Workflows | `/dashboard/workflows` | GitBranch | Main nav |
 | Settings | `/dashboard/settings` | Settings | Footer |
+| Help | `/dashboard/help` | HelpCircle | Footer |
+
+> Campaigns and Agents were consolidated into Workflows.
+> See [`specs/06-unified-workflows.md`](./06-unified-workflows.md) for details.
 
 Active state: exact match for `/dashboard`, prefix match for all others.
 
 ### Page Routes — partial
 
-11 page routes across 6 sections:
+9 page routes across 5 sections:
 
 | Route | Phase | Status | Description |
 |---|---|---|---|
-| `/dashboard` | 1 | implemented | Dashboard home — real metrics from DB (contact/campaign/agent/content counts), recent contacts list, pending tasks list, 4-step onboarding checklist |
+| `/dashboard` | 1 | implemented | Dashboard home — real metrics from DB (contact/workflow/content counts), recent contacts list, pending tasks list, 4-step onboarding checklist |
 | `/dashboard/contacts` | 1 | implemented | Contact list — search by name/company, filter by funnel stage/platform, sortable table with stage badges and scores, add contact dialog |
-| `/dashboard/contacts/[id]` | 1 | implemented | Contact detail — info display, edit form, delete with AlertDialog confirmation, tasks tab with toggle/add/delete |
-| `/dashboard/campaigns` | 2 | placeholder | Campaign list — placeholder previews multi-step AI-powered personalization sequences |
-| `/dashboard/campaigns/[id]` | 2 | placeholder | Campaign detail / builder |
-| `/dashboard/content` | 2 | placeholder | Content library — placeholder previews TipTap editor with platform-specific formatting |
-| `/dashboard/content/[id]` | 2 | placeholder | Content editor |
-| `/dashboard/agents` | 3 | placeholder | Agent list / status — placeholder previews kanban board (Queued/Running/Completed/Failed columns) with live SSE updates and step-by-step execution traces |
-| `/dashboard/agents/[id]` | 3 | placeholder | Agent run detail |
-| `/dashboard/workflows` | 3 | placeholder | Funnel visualization — placeholder previews contact stage progression (Prospect → Engaged → Qualified → Opportunity → Customer → Advocate) |
-| `/dashboard/settings` | 0 | implemented | API key + platform config |
+| `/dashboard/contacts/[id]` | 1 | implemented | Contact detail — info display, edit form, identities tab, tasks tab, enrich button |
+| `/dashboard/content` | 2 | implemented | Content library — compose dialog (single/thread), drafts tab, filters by type/origin/status |
+| `/dashboard/content/[id]` | 2 | implemented | Content detail — engagement metrics, engagement actions (like/retweet/reply), thread context |
+| `/dashboard/workflows` | 3 | implemented | Workflow hub — 3-view switcher (list/kanban/swimlane), quick actions, empty state |
+| `/dashboard/workflows/[id]` | 3 | implemented | Workflow detail — summary cards, agent-specific cards, timeline/graph step visualization |
+| `/dashboard/settings` | 0 | implemented | API key + platform connections (X, LinkedIn, Gmail) + browser enrichment session management |
+| `/dashboard/help` | — | placeholder | Help page |
 
 ### Settings Page — implemented
 
@@ -758,13 +779,16 @@ zod ≥4.0). Required for `npx shadcn` installs and general `npm install`.
 
 | Phase | Name | Status | Delivers |
 |---|---|---|---|
-| **0** | Foundation | complete | CLI launcher, database schema (12 tables), auth system, UI shell with sidebar and all route placeholders, settings page with three-state auth |
-| **1** | Core CRM + X/Twitter | partial | **Done:** Contact CRUD (list, detail, create, edit, delete), task CRUD (create, toggle, delete), dashboard with real DB metrics, search/filter, funnel stage badges, priority badges. Platform enum expanded to 4 channels (x, linkedin, gmail, substack) — see [`specs/02-channels.md`](./02-channels.md). **Remaining:** X OAuth 2.0 flow, X API v2 client, platform adapter interface, rate limiter |
-| **2** | Content + Campaigns | planned | Multimodal content editor (TipTap), content scheduling, campaign builder with drag-and-drop steps, funnel visualization, AI chat sidebar (Vercel AI SDK) |
-| **3** | Agents + Automation | planned | Claude Agent SDK multi-agent integration, agent run tracking with step-by-step kanban visibility, human-in-the-loop approvals, goal-driven agent planning, scheduled job runner, visual workflow builder |
-| **4** | LinkedIn + Browser | planned | LinkedIn OAuth, LinkedIn API adapter, Playwright headless browser automation for session-based scraping and actions, cross-platform contact merging |
-| **5** | Analytics + Insights | planned | Engagement analytics, funnel metrics, agent cost tracking, content performance, campaign ROI dashboards |
-| **6** | Polish + Distribution | planned | npm publish pipeline, onboarding wizard, documentation, error handling hardening, performance optimization |
+| **0** | Foundation | complete | CLI launcher, database schema, auth system (AES-256), UI shell with sidebar, settings page with three-state auth |
+| **1** | Core CRM + X/Twitter | complete | Contact CRUD, task CRUD, X OAuth 2.0, X API v2 client, platform adapter interface, rate limiter, contact identities (golden record), enrichment scores. See [`specs/02-channels.md`](./02-channels.md) |
+| **2** | Content + Channels | complete | Content sync (tweets/mentions), engagement tracking, Gmail OAuth + People API + email metadata, LinkedIn OAuth + OpenID Connect, compose/draft/publish, thread posting. See [`specs/03-content-sync.md`](./03-content-sync.md) |
+| **2.5** | Browser Enrichment | complete | Playwright headless browser, X profile scraping, LLM extraction, anti-detection, profile merge. See [`specs/05-browser-enrichment.md`](./05-browser-enrichment.md) |
+| **3A** | Workflow Foundation | complete | Unified workflow system (merged campaigns + agents + workflows), observable pipeline tracking, 4 visualization views (list/kanban/swimlane/graph). See [`specs/06-unified-workflows.md`](./06-unified-workflows.md) |
+| **3B** | Campaign Templates | planned | Template gallery, activation dialog, pre-defined campaign templates. See [`specs/07-agentic-workflows.md`](./07-agentic-workflows.md) |
+| **3C** | Agent Router | planned | Claude Agent SDK tools, routing engine, multi-source search/scrape workflows |
+| **3D** | Prune + Scheduling | planned | Prune workflows, cron scheduling, repeatable runs |
+| **4** | Analytics + Insights | planned | Engagement analytics, funnel metrics, agent cost tracking, content performance dashboards |
+| **5** | Polish + Distribution | planned | npm publish pipeline, onboarding wizard, documentation, performance optimization |
 
 ---
 
@@ -772,49 +796,75 @@ zod ≥4.0). Required for `npx shadcn` installs and general `npm install`.
 
 | Path | Purpose | Status |
 |---|---|---|
-| `bin/cli.ts` | CLI entry point — npx openvolo | exists |
+| `bin/cli.ts` | CLI entry point — npx openvolo (+ auto identity migration) | exists |
 | `src/app/layout.tsx` | Root layout (fonts, metadata, html/body) | exists |
 | `src/app/globals.css` | Theme system (OKLch colors, light/dark, radii) | exists |
 | `src/app/page.tsx` | Root redirect → /dashboard | exists |
 | `src/app/dashboard/layout.tsx` | Dashboard shell (sidebar + content) | exists |
 | `src/app/dashboard/page.tsx` | Dashboard home | exists |
-| `src/app/dashboard/settings/page.tsx` | Settings page (auth UI) | exists |
-| `src/app/api/settings/route.ts` | API key management endpoint | exists |
-| `src/lib/db/schema.ts` | 12 Drizzle table definitions | exists |
-| `src/lib/db/client.ts` | SQLite connection + Drizzle instance | exists |
-| `src/lib/db/types.ts` | Drizzle-inferred TypeScript types (Contact, Task, etc.) | exists |
-| `src/lib/db/queries/contacts.ts` | Contact query helpers (list, get, create, update, delete) | exists |
-| `src/lib/db/queries/tasks.ts` | Task query helpers (list, get, create, update, delete) | exists |
-| `src/lib/db/queries/dashboard.ts` | Dashboard metrics (counts, recent contacts, pending tasks) | exists |
-| `src/lib/db/migrations/` | Generated SQL migrations | exists |
-| `src/lib/db/migrations/0000_*.sql` | Initial migration (all 12 tables) | exists |
-| `src/lib/auth/crypto.ts` | AES-256-GCM encrypt/decrypt | exists |
-| `src/lib/auth/claude-auth.ts` | API key save/get/validate/clear | exists |
-| `src/lib/utils.ts` | `cn()` utility (clsx + tailwind-merge) | exists |
-| `src/app/api/contacts/route.ts` | GET/POST contacts endpoint | exists |
-| `src/app/api/contacts/[id]/route.ts` | GET/PUT/DELETE single contact endpoint | exists |
-| `src/app/api/tasks/route.ts` | GET/POST tasks endpoint | exists |
-| `src/app/api/tasks/[id]/route.ts` | GET/PUT/DELETE single task endpoint | exists |
+| `src/app/dashboard/settings/page.tsx` | Settings page (auth + platforms + browser session) | exists |
 | `src/app/dashboard/contacts/page.tsx` | Contact list page (server component) | exists |
 | `src/app/dashboard/contacts/[id]/page.tsx` | Contact detail page (server component) | exists |
-| `src/app/dashboard/contacts/[id]/contact-detail-client.tsx` | Contact detail client component (edit, delete, tasks) | exists |
-| `src/components/app-sidebar.tsx` | Navigation sidebar (7 items) | exists |
-| `src/components/contact-form.tsx` | Reusable contact form (create + edit) | exists |
-| `src/components/add-contact-dialog.tsx` | Dialog for adding new contacts | exists |
-| `src/components/add-task-dialog.tsx` | Dialog for adding new tasks | exists |
-| `src/components/funnel-stage-badge.tsx` | Color-coded funnel stage badge | exists |
-| `src/components/priority-badge.tsx` | Color-coded priority badge | exists |
-| `src/components/ui/` | 19 shadcn/ui components | exists |
-| `package.json` | Dependencies, scripts, metadata | exists |
-| `tsconfig.json` | TypeScript compiler config | exists |
-| `tsconfig.cli.json` | CLI build config (ES2022, outputs to dist/) | exists |
-| `.env.example` | Environment variable template (7 vars) | exists |
-| `next.config.ts` | Next.js config (server external packages) | exists |
-| `drizzle.config.ts` | Drizzle ORM migration config | exists |
-| `components.json` | shadcn/ui configuration | exists |
-| `postcss.config.mjs` | PostCSS with @tailwindcss/postcss | exists |
-| `.npmrc` | `legacy-peer-deps=true` for zod v3/v4 conflict | exists |
+| `src/app/dashboard/content/page.tsx` | Content list with compose button + drafts tab | exists |
+| `src/app/dashboard/content/[id]/page.tsx` | Content detail with engagement actions | exists |
+| `src/app/dashboard/workflows/page.tsx` | Workflow hub with view switcher | exists |
+| `src/app/dashboard/workflows/[id]/page.tsx` | Workflow detail with timeline/graph | exists |
+| `src/app/api/settings/route.ts` | API key management endpoint | exists |
+| `src/app/api/contacts/route.ts` | GET/POST contacts endpoint | exists |
+| `src/app/api/contacts/[id]/route.ts` | GET/PUT/DELETE single contact | exists |
+| `src/app/api/contacts/[id]/identities/route.ts` | Identity CRUD for a contact | exists |
+| `src/app/api/content/route.ts` | GET/POST content items | exists |
+| `src/app/api/content/[id]/route.ts` | GET/PUT/DELETE single content item | exists |
+| `src/app/api/tasks/route.ts` | GET/POST tasks endpoint | exists |
+| `src/app/api/tasks/[id]/route.ts` | GET/PUT/DELETE single task | exists |
+| `src/app/api/workflows/route.ts` | GET list workflow runs | exists |
+| `src/app/api/workflows/[id]/route.ts` | GET workflow run detail | exists |
+| `src/app/api/workflows/templates/route.ts` | GET list / POST create templates | exists |
+| `src/app/api/workflows/templates/[id]/route.ts` | GET / PATCH / DELETE template | exists |
+| `src/app/api/platforms/x/` | X OAuth, sync, engage, compose, enrich, browser-session | exists |
+| `src/app/api/platforms/linkedin/` | LinkedIn OAuth, callback, status, sync | exists |
+| `src/app/api/platforms/gmail/` | Gmail OAuth, callback, status, sync | exists |
+| `src/lib/db/schema.ts` | 15 Drizzle table definitions | exists |
+| `src/lib/db/client.ts` | SQLite connection + Drizzle instance | exists |
+| `src/lib/db/types.ts` | Drizzle-inferred TypeScript types | exists |
+| `src/lib/db/enrichment.ts` | Enrichment score calculator | exists |
+| `src/lib/db/queries/contacts.ts` | Contact CRUD + dedup + attachIdentities | exists |
+| `src/lib/db/queries/identities.ts` | Identity CRUD | exists |
+| `src/lib/db/queries/tasks.ts` | Task CRUD | exists |
+| `src/lib/db/queries/dashboard.ts` | Dashboard metrics (counts, recent contacts, tasks) | exists |
+| `src/lib/db/queries/content.ts` | Content CRUD + dedup helpers | exists |
+| `src/lib/db/queries/engagements.ts` | Engagement CRUD | exists |
+| `src/lib/db/queries/sync.ts` | Sync cursor management | exists |
+| `src/lib/db/queries/platform-accounts.ts` | Platform account CRUD | exists |
+| `src/lib/db/queries/workflows.ts` | Workflow run + step CRUD | exists |
+| `src/lib/db/queries/workflow-templates.ts` | Template + step + enrollment CRUD | exists |
+| `src/lib/auth/crypto.ts` | AES-256-GCM encrypt/decrypt | exists |
+| `src/lib/auth/claude-auth.ts` | API key save/get/validate/clear | exists |
+| `src/lib/workflows/types.ts` | WorkflowType, SyncSubType, configs | exists |
+| `src/lib/workflows/run-sync-workflow.ts` | Sync wrapper with observability | exists |
+| `src/lib/platforms/adapter.ts` | Generic platform adapter interface | exists |
+| `src/lib/platforms/rate-limiter.ts` | Shared RateLimitError + rate limit check | exists |
+| `src/lib/platforms/index.ts` | Platform adapter factory | exists |
+| `src/lib/platforms/x/client.ts` | X API client (auth, engagement, compose) | exists |
+| `src/lib/platforms/x/mappers.ts` | X data → Contact/Identity/Content mappers | exists |
+| `src/lib/platforms/linkedin/` | LinkedIn OAuth, client, mappers, adapter | exists |
+| `src/lib/platforms/gmail/` | Gmail OAuth, client, mappers, adapter | exists |
+| `src/lib/platforms/sync-contacts.ts` | X contact import orchestration | exists |
+| `src/lib/platforms/sync-content.ts` | Tweet/mention import with cursor pagination | exists |
+| `src/lib/platforms/sync-linkedin-contacts.ts` | LinkedIn connection import + dedup | exists |
+| `src/lib/platforms/sync-gmail-contacts.ts` | Google People API contact import | exists |
+| `src/lib/platforms/sync-gmail-metadata.ts` | Gmail email interaction enrichment | exists |
+| `src/lib/platforms/sync-x-profiles.ts` | Browser enrichment orchestrator | exists |
+| `src/lib/browser/` | Browser enrichment (session, scraper, anti-detection, extractors) | exists |
+| `src/lib/utils.ts` | `cn()` utility (clsx + tailwind-merge) | exists |
+| `src/components/app-sidebar.tsx` | Navigation sidebar (4 main + 2 footer items) | exists |
+| `src/components/platform-connection-card.tsx` | Platform connection status + sync UI | exists |
+| `src/components/compose-dialog.tsx` | Tweet/thread compose modal | exists |
+| `src/components/enrich-button.tsx` | Single/bulk browser enrichment trigger | exists |
+| `src/components/workflow-*.tsx` | 7 workflow visualization components | exists |
+| `src/components/ui/` | shadcn/ui primitives | exists |
 | `~/.openvolo/data.db` | User's SQLite database | runtime |
 | `~/.openvolo/config.json` | Encrypted credentials | runtime |
-| `~/.openvolo/sessions/` | Agent session storage | runtime |
+| `~/.openvolo/sessions/` | Browser session storage (encrypted cookies) | runtime |
+| `~/.openvolo/browser-profiles/` | Persistent browser profiles per platform | runtime |
 | `~/.openvolo/media/` | Media file storage | runtime |
