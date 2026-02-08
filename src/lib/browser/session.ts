@@ -1,12 +1,20 @@
 import { join } from "path";
 import { homedir } from "os";
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
 import { chromium, type BrowserContext, type Browser } from "playwright";
 import { encrypt, decrypt } from "@/lib/auth/crypto";
 import { randomViewport } from "@/lib/browser/anti-detection";
 import type { BrowserPlatform, BrowserSession, CookieData } from "@/lib/browser/types";
 
 const SESSIONS_DIR = join(homedir(), ".openvolo", "sessions");
+const PROFILES_DIR = join(homedir(), ".openvolo", "browser-profiles");
+
+/** Chromium args that remove automation fingerprints X/Twitter checks for. */
+const STEALTH_ARGS = [
+  "--disable-blink-features=AutomationControlled",
+  "--no-first-run",
+  "--no-default-browser-check",
+];
 
 /** Platform-specific login URLs and logged-in selectors. */
 const PLATFORM_CONFIG: Record<
@@ -53,6 +61,7 @@ export function loadSession(platform: BrowserPlatform): BrowserSession | null {
 
 /** Encrypt and store a session to disk. */
 export function saveSession(session: BrowserSession): void {
+  mkdirSync(SESSIONS_DIR, { recursive: true });
   const json = JSON.stringify(session);
   const encrypted = encrypt(json);
   writeFileSync(sessionPath(session.platform), encrypted, "utf-8");
@@ -68,16 +77,42 @@ export function clearSession(platform: BrowserPlatform): void {
 
 /**
  * Launch a headed (visible) browser for manual login.
+ * Uses persistent context + system Chrome + stealth flags to avoid bot detection.
  * The user logs in themselves (handles 2FA, CAPTCHA).
  * Returns the captured session once the user navigates to the home page.
  */
 export async function setupSession(platform: BrowserPlatform): Promise<BrowserSession> {
   const config = PLATFORM_CONFIG[platform];
   const viewport = randomViewport();
+  const profileDir = join(PROFILES_DIR, platform);
+  mkdirSync(profileDir, { recursive: true });
 
-  const browser = await chromium.launch({ headless: false });
-  const context = await browser.newContext({ viewport });
-  const page = await context.newPage();
+  // Use persistent context with system Chrome to avoid bot detection.
+  // Persistent context keeps login state between runs (like a real user).
+  // Stealth args remove navigator.webdriver and other automation signals.
+  let context: BrowserContext;
+  try {
+    context = await chromium.launchPersistentContext(profileDir, {
+      headless: false,
+      channel: "chrome",
+      viewport,
+      args: STEALTH_ARGS,
+    });
+  } catch {
+    // Fallback: system Chrome unavailable, use bundled Chromium with stealth args
+    context = await chromium.launchPersistentContext(profileDir, {
+      headless: false,
+      viewport,
+      args: STEALTH_ARGS,
+    });
+  }
+
+  const page = context.pages()[0] || await context.newPage();
+
+  // Remove webdriver flag that X checks for
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "webdriver", { get: () => false });
+  });
 
   await page.goto(config.loginUrl, { waitUntil: "domcontentloaded" });
 
@@ -99,7 +134,7 @@ export async function setupSession(platform: BrowserPlatform): Promise<BrowserSe
   }));
 
   const userAgent = await page.evaluate(() => navigator.userAgent);
-  await browser.close();
+  await context.close();
 
   const now = Math.floor(Date.now() / 1000);
   const session: BrowserSession = {
@@ -118,14 +153,23 @@ export async function setupSession(platform: BrowserPlatform): Promise<BrowserSe
 /**
  * Create a headless Playwright context with stored session cookies.
  * Used by scrapers for actual profile navigation.
+ * Uses stealth args to avoid bot detection during scraping.
  */
 export async function createSessionContext(
   session: BrowserSession
 ): Promise<{ browser: Browser; context: BrowserContext }> {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: true,
+    args: STEALTH_ARGS,
+  });
   const context = await browser.newContext({
     viewport: session.viewport,
     userAgent: session.userAgent,
+  });
+
+  // Remove webdriver flag before any page loads
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, "webdriver", { get: () => false });
   });
 
   // Restore cookies

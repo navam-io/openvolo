@@ -60,10 +60,8 @@ export const profileExtractionSchema = z.object({
     ),
   confidence: z
     .number()
-    .min(0)
-    .max(1)
     .describe(
-      "Overall confidence in extractions. 1.0 = explicitly stated, 0.5 = strongly implied, 0.0 = guessing."
+      "Overall confidence in extractions (0.0 to 1.0). 1.0 = explicitly stated, 0.5 = strongly implied, 0.0 = guessing."
     ),
 });
 
