@@ -4,6 +4,17 @@ import {
 } from "@/lib/db/queries/platform-accounts";
 import type { RateLimitState, RateLimitInfo } from "@/lib/platforms/adapter";
 
+/** Thrown when a request is rate-limited. Shared across all platform clients. */
+export class RateLimitError extends Error {
+  constructor(
+    public readonly endpoint: string,
+    public readonly retryAfter: number
+  ) {
+    super(`Rate limited on ${endpoint}. Retry after ${retryAfter}s`);
+    this.name = "RateLimitError";
+  }
+}
+
 /** Read stored rate limit state for an account. */
 export function getRateLimitState(accountId: string): RateLimitState {
   const account = getPlatformAccountById(accountId);

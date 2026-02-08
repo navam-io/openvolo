@@ -8,6 +8,10 @@ export function getPlatformAdapter(platform: string): PlatformAdapter {
       const { XPlatformAdapter } = require("@/lib/platforms/x/adapter");
       return new XPlatformAdapter();
     }
+    case "linkedin": {
+      const { LinkedInPlatformAdapter } = require("@/lib/platforms/linkedin/adapter");
+      return new LinkedInPlatformAdapter();
+    }
     default:
       throw new Error(`Platform "${platform}" is not yet supported`);
   }

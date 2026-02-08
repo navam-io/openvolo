@@ -1,8 +1,11 @@
 import { decrypt } from "@/lib/auth/crypto";
 import { getPlatformAccountById, updatePlatformAccount } from "@/lib/db/queries/platform-accounts";
 import { refreshXTokenAsync } from "@/lib/platforms/x/auth";
-import { checkRateLimit, updateRateLimitFromHeaders } from "@/lib/platforms/rate-limiter";
+import { checkRateLimit, updateRateLimitFromHeaders, RateLimitError } from "@/lib/platforms/rate-limiter";
 import type { PlatformCredentials } from "@/lib/platforms/adapter";
+
+// Re-export RateLimitError for backward compatibility
+export { RateLimitError } from "@/lib/platforms/rate-limiter";
 
 // --- X API Types ---
 
@@ -167,16 +170,6 @@ export class XApiRequestError extends Error {
   constructor(public readonly status: number, message: string) {
     super(message);
     this.name = "XApiRequestError";
-  }
-}
-
-export class RateLimitError extends Error {
-  constructor(
-    public readonly endpoint: string,
-    public readonly retryAfter: number
-  ) {
-    super(`Rate limited on ${endpoint}. Retry after ${retryAfter}s`);
-    this.name = "RateLimitError";
   }
 }
 

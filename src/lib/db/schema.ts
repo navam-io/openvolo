@@ -332,7 +332,7 @@ export const syncCursors = sqliteTable("sync_cursors", {
     .notNull()
     .references(() => platformAccounts.id, { onDelete: "cascade" }),
   dataType: text("data_type", {
-    enum: ["tweets", "mentions", "followers", "following", "dms", "likes"],
+    enum: ["tweets", "mentions", "followers", "following", "dms", "likes", "connections"],
   }).notNull(),
   cursor: text("cursor"), // platform pagination token
   oldestFetchedAt: integer("oldest_fetched_at"), // oldest item timestamp fetched

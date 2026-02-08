@@ -29,6 +29,14 @@ interface XConnectionState {
   grantedScopes: string;
 }
 
+interface LinkedInConnectionState {
+  loading: boolean;
+  connected: boolean;
+  displayName: string | null;
+  status: "active" | "paused" | "needs_reauth" | null;
+  lastSyncedAt: number | null;
+}
+
 interface SyncResultState {
   added: number;
   updated: number;
@@ -72,6 +80,19 @@ function SettingsContent() {
   const [contentSyncResult, setContentSyncResult] = useState<{ type: string; added: number; skipped: number } | null>(null);
   const [syncStatus, setSyncStatus] = useState<Record<string, { status: string; totalSynced: number; lastSyncedAt: number | null }>>({});
 
+  // LinkedIn connection state
+  const [liState, setLiState] = useState<LinkedInConnectionState>({
+    loading: true,
+    connected: false,
+    displayName: null,
+    status: null,
+    lastSyncedAt: null,
+  });
+  const [liConnecting, setLiConnecting] = useState(false);
+  const [liSyncing, setLiSyncing] = useState(false);
+  const [liDisconnecting, setLiDisconnecting] = useState(false);
+  const [liSyncResult, setLiSyncResult] = useState<SyncResultState | null>(null);
+
   function fetchAuth() {
     fetch("/api/settings")
       .then((r) => r.json())
@@ -111,10 +132,28 @@ function SettingsContent() {
       .catch(() => {});
   }
 
+  function fetchLinkedInStatus() {
+    fetch("/api/platforms/linkedin")
+      .then((r) => r.json())
+      .then((data) => {
+        setLiState({
+          loading: false,
+          connected: data.connected,
+          displayName: data.account?.displayName ?? null,
+          status: data.account?.status ?? null,
+          lastSyncedAt: data.account?.lastSyncedAt ?? null,
+        });
+      })
+      .catch(() => {
+        setLiState((prev) => ({ ...prev, loading: false }));
+      });
+  }
+
   useEffect(() => {
     fetchAuth();
     fetchXStatus();
     fetchSyncStatus();
+    fetchLinkedInStatus();
   }, []);
 
   // Handle OAuth callback query params
@@ -125,7 +164,10 @@ function SettingsContent() {
     if (connected === "x") {
       setSuccessMessage("X account connected successfully!");
       fetchXStatus();
-      // Clean the URL
+      window.history.replaceState({}, "", "/dashboard/settings");
+    } else if (connected === "linkedin") {
+      setSuccessMessage("LinkedIn account connected successfully!");
+      fetchLinkedInStatus();
       window.history.replaceState({}, "", "/dashboard/settings");
     } else if (oauthError) {
       setError(`OAuth error: ${oauthError}`);
@@ -271,6 +313,86 @@ function SettingsContent() {
     } finally {
       setSyncingContent(null);
     }
+  }
+
+  async function handleLinkedInConnect() {
+    setLiConnecting(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/platforms/linkedin/auth");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Failed to start LinkedIn OAuth flow");
+        return;
+      }
+
+      window.location.href = data.authUrl;
+    } catch {
+      setError("Failed to connect to LinkedIn");
+    } finally {
+      setLiConnecting(false);
+    }
+  }
+
+  async function handleLinkedInDisconnect() {
+    setLiDisconnecting(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/platforms/linkedin", { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Failed to disconnect");
+        return;
+      }
+      setLiState({
+        loading: false,
+        connected: false,
+        displayName: null,
+        status: null,
+        lastSyncedAt: null,
+      });
+      setLiSyncResult(null);
+    } catch {
+      setError("Failed to disconnect");
+    } finally {
+      setLiDisconnecting(false);
+    }
+  }
+
+  async function handleLinkedInSync() {
+    setLiSyncing(true);
+    setLiSyncResult(null);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/platforms/linkedin/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "contacts" }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "LinkedIn sync failed");
+        return;
+      }
+
+      setLiSyncResult(data.result);
+      fetchLinkedInStatus();
+    } catch {
+      setError("LinkedIn sync failed");
+    } finally {
+      setLiSyncing(false);
+    }
+  }
+
+  function getLinkedInConnectionStatus(): "disconnected" | "connected" | "needs_reauth" {
+    if (!liState.connected) return "disconnected";
+    if (liState.status === "needs_reauth") return "needs_reauth";
+    return "connected";
   }
 
   function formatSyncTime(unix: number | null | undefined): string {
@@ -553,15 +675,50 @@ function SettingsContent() {
             </>
           )}
 
-          <div className="flex items-center justify-between rounded-lg border p-4">
-            <div>
-              <p className="font-medium">LinkedIn</p>
-              <p className="text-sm text-muted-foreground">
-                Connect via OAuth 2.0 or browser session
-              </p>
+          {/* LinkedIn Connection */}
+          {liState.loading ? (
+            <div className="flex items-center justify-center rounded-lg border p-4">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <span className="text-sm text-muted-foreground">Loading LinkedIn status...</span>
             </div>
-            <Badge variant="secondary">Coming in Phase 4</Badge>
-          </div>
+          ) : (
+            <PlatformConnectionCard
+              platform="linkedin"
+              displayName="LinkedIn"
+              accountHandle={liState.displayName ?? undefined}
+              lastSyncedAt={liState.lastSyncedAt}
+              status={getLinkedInConnectionStatus()}
+              syncCapable={true}
+              onConnect={handleLinkedInConnect}
+              onDisconnect={handleLinkedInDisconnect}
+              onSync={handleLinkedInSync}
+              connecting={liConnecting}
+              syncing={liSyncing}
+              disconnecting={liDisconnecting}
+            />
+          )}
+
+          {/* LinkedIn sync results */}
+          {liSyncResult && (
+            <div className="rounded-lg border bg-muted/50 p-4 text-sm">
+              <p className="font-medium mb-1">LinkedIn Sync Complete</p>
+              <div className="flex gap-4 text-muted-foreground">
+                <span>Added: {liSyncResult.added}</span>
+                <span>Updated: {liSyncResult.updated}</span>
+                <span>Skipped: {liSyncResult.skipped}</span>
+              </div>
+              {liSyncResult.errors.length > 0 && (
+                <div className="mt-2 text-destructive">
+                  <p className="font-medium">Errors:</p>
+                  <ul className="list-disc pl-4">
+                    {liSyncResult.errors.map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
