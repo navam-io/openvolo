@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Key, CheckCircle, XCircle, Loader2, Monitor, Download, Upload, Globe, Sparkles, Trash2 } from "lucide-react";
+import { Key, CheckCircle, XCircle, Loader2, Monitor, Download, Upload, Globe, Sparkles, Trash2, Search } from "lucide-react";
 import { PlatformConnectionCard } from "@/components/platform-connection-card";
 
 type AuthSource = "env_var" | "config" | "none";
@@ -140,6 +140,67 @@ function SettingsContent() {
     totalEnriched: number;
     lastEnrichedAt: number | null;
   } | null>(null);
+
+  // Search API state
+  const [searchApiKey, setSearchApiKey] = useState("");
+  const [searchApi, setSearchApi] = useState<{
+    loading: boolean;
+    configured: boolean;
+    source: string;
+    keyPrefix: string | null;
+  }>({ loading: true, configured: false, source: "none", keyPrefix: null });
+  const [searchApiSaving, setSearchApiSaving] = useState(false);
+
+  function fetchSearchApiStatus() {
+    fetch("/api/settings/search-api")
+      .then((r) => r.json())
+      .then((data) => {
+        setSearchApi({
+          loading: false,
+          configured: data.configured,
+          source: data.source ?? "none",
+          keyPrefix: data.keyPrefix ?? null,
+        });
+      })
+      .catch(() => {
+        setSearchApi((prev) => ({ ...prev, loading: false }));
+      });
+  }
+
+  async function handleSearchApiSave() {
+    if (!searchApiKey.trim()) return;
+    setSearchApiSaving(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/settings/search-api", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save_key", apiKey: searchApiKey.trim() }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error);
+      } else {
+        setSearchApiKey("");
+        fetchSearchApiStatus();
+      }
+    } catch {
+      setError("Failed to save Search API key");
+    } finally {
+      setSearchApiSaving(false);
+    }
+  }
+
+  async function handleSearchApiClear() {
+    await fetch("/api/settings/search-api", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "clear_key" }),
+    });
+    fetchSearchApiStatus();
+  }
 
   function fetchAuth() {
     fetch("/api/settings")
@@ -341,6 +402,7 @@ function SettingsContent() {
     fetchGmailStatus();
     fetchBrowserSession();
     fetchEnrichStatus();
+    fetchSearchApiStatus();
   }, []);
 
   // Handle OAuth callback query params
@@ -865,6 +927,97 @@ function SettingsContent() {
               </Button>
               <p className="text-xs text-muted-foreground">
                 Or set <code className="rounded bg-muted px-1 py-0.5 text-xs">ANTHROPIC_API_KEY</code> in <code className="rounded bg-muted px-1 py-0.5 text-xs">.env.local</code> and restart the server.
+              </p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Brave Search API Key */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2">
+                <Search className="h-5 w-5" />
+                Search API Key
+              </CardTitle>
+              <CardDescription>
+                Required for AI agent web search. Get a free key at{" "}
+                <a
+                  href="https://brave.com/search/api/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline"
+                >
+                  brave.com/search/api
+                </a>
+                {" "}(2,000 free queries/month).
+              </CardDescription>
+            </div>
+            {searchApi.loading ? (
+              <Badge variant="outline">
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                Checking
+              </Badge>
+            ) : searchApi.configured ? (
+              <Badge variant="default" className="bg-green-600">
+                <CheckCircle className="mr-1 h-3 w-3" />
+                {searchApi.source === "env_var" ? "Environment Variable" : "Connected"}
+              </Badge>
+            ) : (
+              <Badge variant="secondary">
+                <XCircle className="mr-1 h-3 w-3" />
+                Not configured
+              </Badge>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {searchApi.loading ? null : searchApi.configured ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm text-muted-foreground">
+                    {searchApi.source === "env_var"
+                      ? "Key detected from environment variable."
+                      : "API key saved and encrypted."}
+                  </p>
+                  {searchApi.keyPrefix && (
+                    <p className="font-mono text-sm text-muted-foreground">
+                      {searchApi.keyPrefix}
+                    </p>
+                  )}
+                </div>
+                {searchApi.source !== "env_var" && (
+                  <Button variant="destructive" size="sm" onClick={handleSearchApiClear}>
+                    Remove Key
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="search-api-key">Brave Search API Key</Label>
+                <Input
+                  id="search-api-key"
+                  type="password"
+                  placeholder="BSA..."
+                  value={searchApiKey}
+                  onChange={(e) => setSearchApiKey(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSearchApiSave()}
+                />
+              </div>
+              <Button
+                onClick={handleSearchApiSave}
+                disabled={searchApiSaving || !searchApiKey.trim()}
+              >
+                {searchApiSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save & Validate
+              </Button>
+              <p className="text-xs text-muted-foreground">
+                Or set <code className="rounded bg-muted px-1 py-0.5 text-xs">BRAVE_SEARCH_API_KEY</code> in <code className="rounded bg-muted px-1 py-0.5 text-xs">.env.local</code> and restart.
               </p>
             </>
           )}

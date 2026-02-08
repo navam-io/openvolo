@@ -105,6 +105,12 @@ export const workflowTemplates = sqliteTable("workflow_templates", {
   goalMetrics: text("goal_metrics").default("{}"), // JSON
   startsAt: integer("starts_at"),
   endsAt: integer("ends_at"),
+  // Agent runner columns
+  systemPrompt: text("system_prompt"), // Claude system prompt for this template
+  targetPersona: text("target_persona"), // Description of target contact persona
+  estimatedCost: real("estimated_cost").notNull().default(0), // Estimated cost per run in USD
+  totalRuns: integer("total_runs").notNull().default(0), // Lifetime run count
+  lastRunAt: integer("last_run_at"), // Timestamp of most recent run
   ...timestamps,
 });
 
@@ -340,6 +346,8 @@ export const workflowRuns = sqliteTable("workflow_runs", {
   outputTokens: integer("output_tokens").notNull().default(0),
   costUsd: real("cost_usd").notNull().default(0),
   parentWorkflowId: text("parent_workflow_id"), // self-FK for sub-workflows
+  sourceTotal: integer("source_total"), // Total items at the source
+  sourceProcessed: integer("source_processed").notNull().default(0), // Items processed from source
   startedAt: integer("started_at"),
   completedAt: integer("completed_at"),
   ...timestamps,

@@ -67,6 +67,17 @@ async function startApp(port: number) {
     } catch {
       // Migration module may not be available in all contexts
     }
+
+    // Seed workflow templates (idempotent)
+    try {
+      const { seedTemplates } = await import("../src/lib/db/seed-templates");
+      const seedResult = seedTemplates();
+      if (seedResult.seeded > 0) {
+        console.log(`  Seeded ${seedResult.seeded} workflow templates ✓`);
+      }
+    } catch {
+      // Seed module may not be available in all contexts
+    }
   } catch (e) {
     console.log("  Database initialization skipped (will retry on first request)");
   }

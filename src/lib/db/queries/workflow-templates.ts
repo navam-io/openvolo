@@ -36,7 +36,9 @@ export function updateTemplate(
   data: Partial<
     Pick<
       WorkflowTemplate,
-      "name" | "description" | "platform" | "templateType" | "status" | "config" | "goalMetrics" | "startsAt" | "endsAt"
+      | "name" | "description" | "platform" | "templateType" | "status"
+      | "config" | "goalMetrics" | "startsAt" | "endsAt"
+      | "systemPrompt" | "targetPersona" | "estimatedCost" | "totalRuns" | "lastRunAt"
     >
   >
 ): WorkflowTemplate | undefined {

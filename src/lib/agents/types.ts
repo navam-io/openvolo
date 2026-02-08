@@ -1,0 +1,73 @@
+import type { WorkflowType } from "@/lib/workflows/types";
+
+/** Configuration for an agent workflow run. */
+export interface AgentRunConfig {
+  templateId?: string;
+  workflowType: WorkflowType;
+  systemPrompt?: string;
+  maxSteps?: number;
+  model?: string;
+  config?: Record<string, unknown>;
+}
+
+/** Result of a URL fetch operation. */
+export interface UrlFetchResult {
+  url: string;
+  title: string;
+  description: string;
+  content: string;
+  contentLength: number;
+  needsBrowser: boolean;
+}
+
+/** Result of a browser scrape operation. */
+export interface BrowserScrapeResult {
+  url: string;
+  title: string;
+  content: string;
+  contentLength: number;
+  success: boolean;
+  error?: string;
+}
+
+/** A single web search result. */
+export interface SearchResult {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+/** Result of a web search operation. */
+export interface WebSearchResult {
+  query: string;
+  results: SearchResult[];
+  totalResults: number;
+}
+
+/** Result of enriching a contact. */
+export interface EnrichContactResult {
+  contactId: string;
+  contactName: string;
+  fieldsUpdated: string[];
+  previousScore: number;
+  newScore: number;
+}
+
+/** Routing strategy for a URL. */
+export type FetchStrategy = "url_fetch" | "browser_scrape";
+
+/** Result of the routing decision. */
+export interface RoutingDecision {
+  url: string;
+  strategy: FetchStrategy;
+  reason: string;
+}
+
+/** Cost rates for Claude models (per 1M tokens). */
+export const MODEL_COST_RATES: Record<string, { input: number; output: number }> = {
+  "claude-sonnet-4-5-20250929": { input: 3.0, output: 15.0 },
+  "claude-haiku-4-5-20251001": { input: 0.80, output: 4.0 },
+};
+
+/** Default model for agent workflows. */
+export const DEFAULT_AGENT_MODEL = "claude-sonnet-4-5-20250929";

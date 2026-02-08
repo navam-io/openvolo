@@ -40,6 +40,8 @@ export function updateWorkflowRun(
       | "inputTokens"
       | "outputTokens"
       | "costUsd"
+      | "sourceTotal"
+      | "sourceProcessed"
     >
   >
 ): WorkflowRun | undefined {
