@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { formatWorkflowError } from "@/lib/workflows/format-error";
 
 const TYPE_ICONS: Record<string, typeof RefreshCw> = {
   sync: RefreshCw,
@@ -157,11 +158,17 @@ export default async function WorkflowDetailPage({
             {(() => {
               try {
                 const errors: string[] = JSON.parse(run.errors ?? "[]");
-                return errors.map((err, i) => (
-                  <p key={i} className="text-xs text-destructive">
-                    {err}
-                  </p>
-                ));
+                return errors.map((err, i) => {
+                  const friendly = formatWorkflowError(err);
+                  return (
+                    <div key={i} className="space-y-0.5" title={err}>
+                      <p className="text-xs text-destructive font-medium">{friendly.title}</p>
+                      {friendly.detail && (
+                        <p className="text-xs text-muted-foreground">{friendly.detail}</p>
+                      )}
+                    </div>
+                  );
+                });
               } catch {
                 return <p className="text-xs text-muted-foreground">Unable to parse errors</p>;
               }

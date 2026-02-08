@@ -17,6 +17,7 @@ import {
   SkipForward,
 } from "lucide-react";
 import type { WorkflowStep } from "@/lib/db/types";
+import { formatWorkflowError } from "@/lib/workflows/format-error";
 
 const STEP_TYPE_CONFIG: Record<
   string,
@@ -113,9 +114,17 @@ export function WorkflowStepTimeline({ steps }: { steps: WorkflowStep[] }) {
                   {step.url}
                 </p>
               )}
-              {step.error && (
-                <p className="text-xs text-destructive">{step.error}</p>
-              )}
+              {step.error && (() => {
+                const friendly = formatWorkflowError(step.error);
+                return (
+                  <p className="text-xs text-destructive" title={step.error}>
+                    {friendly.title}
+                    {friendly.detail && (
+                      <span className="text-muted-foreground ml-1">— {friendly.detail}</span>
+                    )}
+                  </p>
+                );
+              })()}
               {output && Object.keys(output).length > 0 && !step.error && (
                 <p className="text-xs text-muted-foreground">
                   {Object.entries(output)
