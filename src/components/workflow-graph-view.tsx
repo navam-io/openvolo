@@ -119,9 +119,6 @@ function GraphNode({ step, isLast }: { step: WorkflowStep; isLast: boolean }) {
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 font-normal shrink-0">
               {config.label}
             </Badge>
-            {step.tool && (
-              <span className="text-xs text-muted-foreground truncate">{step.tool}</span>
-            )}
             <div className="ml-auto flex items-center gap-2 shrink-0">
               {step.durationMs !== null && step.durationMs > 0 && (
                 <span className="text-[10px] font-mono text-muted-foreground">

@@ -125,9 +125,6 @@ export function WorkflowStepTimeline({ steps, animate }: { steps: WorkflowStep[]
 
             {/* Description / details */}
             <div className="flex-1 min-w-0 space-y-0.5">
-              {step.tool && (
-                <span className="text-xs text-muted-foreground">{step.tool}</span>
-              )}
               {step.url && (
                 <p className="text-xs font-mono truncate text-muted-foreground">
                   {step.url}
