@@ -29,3 +29,10 @@ next-env.d.ts
 
 # playwright sessions
 sessions/
+
+# local tooling
+.obsidian/
+.playwright-mcp/
+
+# runtime data
+data/
