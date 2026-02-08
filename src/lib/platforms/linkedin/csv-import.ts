@@ -31,8 +31,18 @@ export function parseLinkedInCsv(text: string): LinkedInCsvRow[] {
   const lines = cleaned.split(/\r?\n/).filter((line) => line.trim().length > 0);
   if (lines.length < 2) return []; // Need at least header + one data row
 
+  // LinkedIn CSVs may have a "Notes:" preamble before the actual header.
+  // Scan for the real header line containing "First Name".
+  let headerLineIdx = 0;
+  for (let i = 0; i < Math.min(lines.length, 10); i++) {
+    if (lines[i].toLowerCase().includes("first name")) {
+      headerLineIdx = i;
+      break;
+    }
+  }
+
   // Parse header to discover column indices (LinkedIn may vary casing/order)
-  const headerFields = parseCsvLine(lines[0]);
+  const headerFields = parseCsvLine(lines[headerLineIdx]);
   const colMap = new Map<string, number>();
   for (let i = 0; i < headerFields.length; i++) {
     colMap.set(headerFields[i].trim().toLowerCase(), i);
@@ -53,7 +63,7 @@ export function parseLinkedInCsv(text: string): LinkedInCsvRow[] {
   }
 
   const rows: LinkedInCsvRow[] = [];
-  for (let i = 1; i < lines.length; i++) {
+  for (let i = headerLineIdx + 1; i < lines.length; i++) {
     const fields = parseCsvLine(lines[i]);
     const firstName = (fields[firstNameIdx] ?? "").trim();
     const lastName = (fields[lastNameIdx] ?? "").trim();
@@ -161,6 +171,13 @@ function processRow(row: LinkedInCsvRow, result: SyncResult): void {
   const fullName = [row.firstName, row.lastName].filter(Boolean).join(" ");
 
   if (!vanityName && !fullName) {
+    // Row has no usable identifier — skip it (e.g. all-empty rows with just a date)
+    result.skipped++;
+    return;
+  }
+
+  // Skip rows where name is just whitespace artifacts from malformed CSV
+  if (!fullName && !row.email) {
     result.skipped++;
     return;
   }
@@ -219,8 +236,8 @@ function processRow(row: LinkedInCsvRow, result: SyncResult): void {
           contactId: existingContact.id,
           platform: "linkedin",
           platformUserId: vanityName,
-          platformHandle: vanityName,
-          platformUrl: row.url,
+          platformHandle: vanityName || fullName,
+          platformUrl: row.url || null,
           platformData: JSON.stringify({
             source: "csv_import",
             connectedOn: row.connectedOn,
@@ -251,8 +268,8 @@ function processRow(row: LinkedInCsvRow, result: SyncResult): void {
       contactId: contact.id,
       platform: "linkedin",
       platformUserId: vanityName,
-      platformHandle: vanityName,
-      platformUrl: row.url,
+      platformHandle: vanityName || fullName,
+      platformUrl: row.url || null,
       platformData: JSON.stringify({
         source: "csv_import",
         connectedOn: row.connectedOn,
