@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Key, CheckCircle, XCircle, Loader2, Monitor, Download } from "lucide-react";
+import { Key, CheckCircle, XCircle, Loader2, Monitor, Download, Upload } from "lucide-react";
 import { PlatformConnectionCard } from "@/components/platform-connection-card";
 
 type AuthSource = "env_var" | "config" | "none";
@@ -35,6 +35,7 @@ interface LinkedInConnectionState {
   displayName: string | null;
   status: "active" | "paused" | "needs_reauth" | null;
   lastSyncedAt: number | null;
+  grantedScopes: string;
 }
 
 interface SyncResultState {
@@ -87,11 +88,16 @@ function SettingsContent() {
     displayName: null,
     status: null,
     lastSyncedAt: null,
+    grantedScopes: "",
   });
   const [liConnecting, setLiConnecting] = useState(false);
   const [liSyncing, setLiSyncing] = useState(false);
   const [liDisconnecting, setLiDisconnecting] = useState(false);
   const [liSyncResult, setLiSyncResult] = useState<SyncResultState | null>(null);
+
+  // LinkedIn CSV import state
+  const [liImporting, setLiImporting] = useState(false);
+  const [liImportResult, setLiImportResult] = useState<SyncResultState | null>(null);
 
   function fetchAuth() {
     fetch("/api/settings")
@@ -142,6 +148,7 @@ function SettingsContent() {
           displayName: data.account?.displayName ?? null,
           status: data.account?.status ?? null,
           lastSyncedAt: data.account?.lastSyncedAt ?? null,
+          grantedScopes: data.account?.grantedScopes ?? "",
         });
       })
       .catch(() => {
@@ -353,6 +360,7 @@ function SettingsContent() {
         displayName: null,
         status: null,
         lastSyncedAt: null,
+        grantedScopes: "",
       });
       setLiSyncResult(null);
     } catch {
@@ -386,6 +394,34 @@ function SettingsContent() {
       setError("LinkedIn sync failed");
     } finally {
       setLiSyncing(false);
+    }
+  }
+
+  async function handleLinkedInCsvImport(file: File) {
+    setLiImporting(true);
+    setLiImportResult(null);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/platforms/linkedin/import", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "CSV import failed");
+        return;
+      }
+
+      setLiImportResult(data.result);
+    } catch {
+      setError("CSV import failed");
+    } finally {
+      setLiImporting(false);
     }
   }
 
@@ -689,6 +725,7 @@ function SettingsContent() {
               lastSyncedAt={liState.lastSyncedAt}
               status={getLinkedInConnectionStatus()}
               syncCapable={true}
+              grantedScopes={liState.grantedScopes || undefined}
               onConnect={handleLinkedInConnect}
               onDisconnect={handleLinkedInDisconnect}
               onSync={handleLinkedInSync}
@@ -719,6 +756,64 @@ function SettingsContent() {
               )}
             </div>
           )}
+
+          {/* LinkedIn CSV Import */}
+          <Separator />
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium">LinkedIn CSV Import</h3>
+            <p className="text-xs text-muted-foreground">
+              Upload a Connections CSV exported from LinkedIn (Settings &rarr; Data Privacy &rarr; Get a copy of your data).
+              Works without a connected LinkedIn account.
+            </p>
+            <div className="flex items-center gap-3">
+              <input
+                type="file"
+                accept=".csv"
+                id="linkedin-csv-input"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleLinkedInCsvImport(file);
+                  e.target.value = ""; // Reset so re-selecting same file triggers onChange
+                }}
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => document.getElementById("linkedin-csv-input")?.click()}
+                disabled={liImporting}
+              >
+                {liImporting ? (
+                  <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                ) : (
+                  <Upload className="mr-1 h-3 w-3" />
+                )}
+                {liImporting ? "Importing..." : "Import CSV"}
+              </Button>
+            </div>
+
+            {/* CSV import result */}
+            {liImportResult && (
+              <div className="rounded-lg border bg-muted/50 p-3 text-sm">
+                <p className="font-medium mb-1">CSV Import Complete</p>
+                <div className="flex gap-4 text-muted-foreground text-xs">
+                  <span>Added: {liImportResult.added}</span>
+                  <span>Updated: {liImportResult.updated}</span>
+                  <span>Skipped: {liImportResult.skipped}</span>
+                </div>
+                {liImportResult.errors.length > 0 && (
+                  <div className="mt-2 text-destructive text-xs">
+                    <p className="font-medium">Errors:</p>
+                    <ul className="list-disc pl-4">
+                      {liImportResult.errors.map((err, i) => (
+                        <li key={i}>{err}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>
