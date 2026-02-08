@@ -25,6 +25,7 @@ export default async function ContentPage({
         content={content}
         currentType={params.type}
         currentOrigin={params.origin}
+        currentStatus={params.status}
       />
     </div>
   );

@@ -22,7 +22,7 @@ export async function GET(
   if (!item) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json(item);
+  return NextResponse.json({ item });
 }
 
 export async function PUT(

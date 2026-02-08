@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useCallback, Suspense } from "react";
+import { useState, useCallback, Suspense, useMemo } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,14 +14,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileText, Download, Loader2, Heart, MessageCircle, Repeat2, Quote, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { FileText, Download, Loader2, Heart, MessageCircle, Repeat2, Quote, ExternalLink, ChevronDown, ChevronUp, PenSquare, Pencil } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
+import { ComposeDialog } from "@/components/compose-dialog";
 import type { ContentItemWithPost } from "@/lib/db/types";
 
 const originFilters = [
   { value: "all", label: "All" },
   { value: "authored", label: "Tweets" },
   { value: "received", label: "Mentions" },
+  { value: "drafts", label: "Drafts" },
 ];
 
 const contentTypeLabels: Record<string, string> = {
@@ -40,11 +42,13 @@ interface ContentListClientProps {
   content: ContentItemWithPost[];
   currentType?: string;
   currentOrigin?: string;
+  currentStatus?: string;
 }
 
 function ContentListInner({
   content,
   currentOrigin,
+  currentStatus,
 }: ContentListClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -52,14 +56,33 @@ function ContentListInner({
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [syncResult, setSyncResult] = useState<{ type: string; added: number; skipped: number; errors: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [composeDraftId, setComposeDraftId] = useState<string | null>(null);
+
+  // Compute thread counts for badge display
+  const threadCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of content) {
+      if (item.threadId) {
+        counts.set(item.threadId, (counts.get(item.threadId) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [content]);
 
   const updateParams = useCallback(
     (key: string, value: string) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (value && value !== "all") {
-        params.set(key, value);
+      if (value === "drafts") {
+        params.delete("origin");
+        params.set("status", "draft");
       } else {
-        params.delete(key);
+        params.delete("status");
+        if (value && value !== "all") {
+          params.set(key, value);
+        } else {
+          params.delete(key);
+        }
       }
       router.push(`/dashboard/content?${params.toString()}`);
     },
@@ -113,7 +136,7 @@ function ContentListInner({
       {/* Action bar */}
       <div className="flex items-center justify-between gap-4">
         <Tabs
-          defaultValue={currentOrigin ?? "all"}
+          defaultValue={currentStatus === "draft" ? "drafts" : (currentOrigin ?? "all")}
           onValueChange={(v) => updateParams("origin", v)}
         >
           <TabsList>
@@ -126,6 +149,16 @@ function ContentListInner({
         </Tabs>
 
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => {
+              setComposeDraftId(null);
+              setComposeOpen(true);
+            }}
+          >
+            <PenSquare className="mr-2 h-4 w-4" />
+            Compose
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -286,10 +319,34 @@ function ContentListInner({
                             {item.origin}
                           </Badge>
                         )}
+                        {item.status === "draft" && (
+                          <Badge variant="outline" className="text-xs w-fit border-yellow-500 text-yellow-600">
+                            draft
+                          </Badge>
+                        )}
+                        {item.threadId && threadCounts.get(item.threadId)! > 1 && (
+                          <Badge variant="outline" className="text-xs w-fit">
+                            Thread ({threadCounts.get(item.threadId)})
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell>
-                      {snapshot ? (
+                      {item.status === "draft" ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setComposeDraftId(item.id);
+                            setComposeOpen(true);
+                          }}
+                        >
+                          <Pencil className="mr-1.5 h-3 w-3" />
+                          Edit
+                        </Button>
+                      ) : snapshot ? (
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1" title="Likes">
                             <Heart className="h-3 w-3" />
@@ -322,6 +379,14 @@ function ContentListInner({
           </Table>
         </div>
       )}
+
+      {/* Compose dialog */}
+      <ComposeDialog
+        open={composeOpen}
+        onOpenChange={setComposeOpen}
+        draftId={composeDraftId}
+        onSuccess={() => router.refresh()}
+      />
     </div>
   );
 }

@@ -50,6 +50,7 @@ export function listContentItems(opts?: {
   platform?: string;
   status?: string;
   platformAccountId?: string;
+  threadId?: string;
 }): ContentItemWithPost[] {
   const conditions: SQL[] = [];
 
@@ -70,6 +71,9 @@ export function listContentItems(opts?: {
   }
   if (opts?.platformAccountId) {
     conditions.push(eq(contentItems.platformAccountId, opts.platformAccountId));
+  }
+  if (opts?.threadId) {
+    conditions.push(eq(contentItems.threadId, opts.threadId));
   }
 
   const query = db.select().from(contentItems);
@@ -143,6 +147,18 @@ export function getContentPostByPlatformId(
       )
     )
     .get();
+}
+
+/** Get all content items in a thread, ordered by creation time. */
+export function getThreadItems(threadId: string): ContentItemWithPost[] {
+  const rows = db
+    .select()
+    .from(contentItems)
+    .where(eq(contentItems.threadId, threadId))
+    .orderBy(contentItems.createdAt)
+    .all();
+
+  return attachPostsAndMetrics(rows);
 }
 
 /** Upsert an engagement metrics snapshot for a content post. */

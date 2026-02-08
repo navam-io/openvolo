@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getContentItem } from "@/lib/db/queries/content";
+import { getContentItem, getThreadItems } from "@/lib/db/queries/content";
 import { listEngagementsByContentPost } from "@/lib/db/queries/engagements";
 import { getPlatformAccountByPlatform } from "@/lib/db/queries/platform-accounts";
 import { Card, CardContent } from "@/components/ui/card";
@@ -58,6 +58,10 @@ export default async function ContentDetailPage({
     ? listEngagementsByContentPost(item.post.id)
     : [];
 
+  // Get thread context if this item belongs to a thread
+  const threadItems = item.threadId ? getThreadItems(item.threadId) : [];
+  const isThread = threadItems.length > 1;
+
   return (
     <div className="space-y-6 max-w-3xl">
       {/* Back navigation */}
@@ -84,6 +88,16 @@ export default async function ContentDetailPage({
               )}
               {item.direction && (
                 <Badge variant="outline">{item.direction}</Badge>
+              )}
+              {item.status === "draft" && (
+                <Badge variant="outline" className="border-yellow-500 text-yellow-600">
+                  draft
+                </Badge>
+              )}
+              {isThread && (
+                <Badge variant="outline">
+                  Thread ({threadItems.length} tweets)
+                </Badge>
               )}
             </div>
             {item.post?.platformUrl && (
@@ -138,6 +152,64 @@ export default async function ContentDetailPage({
           )}
         </CardContent>
       </Card>
+
+      {/* Thread context */}
+      {isThread && (
+        <Card>
+          <CardContent className="pt-6">
+            <h3 className="text-sm font-medium mb-3">Thread ({threadItems.length} tweets)</h3>
+            <div className="space-y-0">
+              {threadItems.map((ti, idx) => {
+                const isCurrent = ti.id === item.id;
+                return (
+                  <div key={ti.id} className="flex gap-3">
+                    {/* Vertical connector */}
+                    <div className="flex flex-col items-center">
+                      <div
+                        className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                          isCurrent ? "bg-primary" : "bg-muted-foreground/30"
+                        }`}
+                      />
+                      {idx < threadItems.length - 1 && (
+                        <div className="w-0.5 flex-1 bg-muted-foreground/20 min-h-4" />
+                      )}
+                    </div>
+
+                    {/* Tweet content */}
+                    {isCurrent ? (
+                      <div className="pb-3 flex-1">
+                        <p className="text-sm font-medium text-foreground">
+                          {ti.body
+                            ? ti.body.length > 100
+                              ? ti.body.slice(0, 100) + "..."
+                              : ti.body
+                            : "No content"}
+                        </p>
+                        <Badge variant="secondary" className="text-xs mt-1">
+                          Current
+                        </Badge>
+                      </div>
+                    ) : (
+                      <Link
+                        href={`/dashboard/content/${ti.id}`}
+                        className="pb-3 flex-1 group"
+                      >
+                        <p className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                          {ti.body
+                            ? ti.body.length > 100
+                              ? ti.body.slice(0, 100) + "..."
+                              : ti.body
+                            : "No content"}
+                        </p>
+                      </Link>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Engagement action bar */}
       {canEngage && item.post && (

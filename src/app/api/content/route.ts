@@ -24,9 +24,10 @@ export async function GET(req: NextRequest) {
   const platform = searchParams.get("platform") ?? undefined;
   const status = searchParams.get("status") ?? undefined;
   const platformAccountId = searchParams.get("platformAccountId") ?? undefined;
+  const threadId = searchParams.get("threadId") ?? undefined;
 
-  const results = listContentItems({ contentType, origin, platform, status, platformAccountId });
-  return NextResponse.json(results);
+  const results = listContentItems({ contentType, origin, platform, status, platformAccountId, threadId });
+  return NextResponse.json({ items: results });
 }
 
 export async function POST(req: NextRequest) {

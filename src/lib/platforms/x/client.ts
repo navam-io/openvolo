@@ -349,3 +349,49 @@ export async function replyToTweet(
   });
   return res.data;
 }
+
+// --- Compose Actions ---
+
+/** Post a single tweet. */
+export async function postTweet(
+  accountId: string,
+  text: string
+): Promise<XTweet> {
+  const res = await xApiFetch<XTweet>(accountId, `/tweets`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  return res.data;
+}
+
+/** Post a thread (array of tweet texts). Returns posted tweets in order. */
+export async function postThread(
+  accountId: string,
+  tweets: string[]
+): Promise<{ posted: XTweet[]; error?: string }> {
+  const posted: XTweet[] = [];
+
+  for (let i = 0; i < tweets.length; i++) {
+    try {
+      const body: Record<string, unknown> = { text: tweets[i] };
+
+      // Chain each tweet as a reply to the previous one
+      if (i > 0) {
+        body.reply = { in_reply_to_tweet_id: posted[i - 1].id };
+      }
+
+      const res = await xApiFetch<XTweet>(accountId, `/tweets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      posted.push(res.data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      return { posted, error: `Failed on tweet ${i + 1}: ${message}` };
+    }
+  }
+
+  return { posted };
+}
