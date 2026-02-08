@@ -114,9 +114,9 @@ export function WorkflowRunLive({ initialRun }: { initialRun: WorkflowRunWithSte
               <div className="rounded bg-muted p-2">
                 <Cpu className="h-4 w-4 text-muted-foreground" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Model</p>
-                <p className="text-sm font-medium font-mono">{run.model}</p>
+                <p className="text-sm font-medium font-mono truncate">{run.model}</p>
               </div>
             </Card>
           )}
@@ -124,7 +124,7 @@ export function WorkflowRunLive({ initialRun }: { initialRun: WorkflowRunWithSte
             <div className="rounded bg-muted p-2">
               <Bot className="h-4 w-4 text-muted-foreground" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs text-muted-foreground">Tokens</p>
               <p className="text-sm font-medium tabular-nums">
                 {totalTokens.toLocaleString()}
@@ -139,7 +139,7 @@ export function WorkflowRunLive({ initialRun }: { initialRun: WorkflowRunWithSte
               <div className="rounded bg-muted p-2">
                 <Coins className="h-4 w-4 text-muted-foreground" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs text-muted-foreground">Cost</p>
                 <p className="text-sm font-medium tabular-nums">
                   ${run.costUsd.toFixed(4)}
