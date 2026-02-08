@@ -9,7 +9,7 @@ import { WorkflowStepTimeline } from "@/components/workflow-step-timeline";
 import { WorkflowGraphView } from "@/components/workflow-graph-view";
 import type { WorkflowStep } from "@/lib/db/types";
 
-export function WorkflowDetailSteps({ steps }: { steps: WorkflowStep[] }) {
+export function WorkflowDetailSteps({ steps, animate }: { steps: WorkflowStep[]; animate?: boolean }) {
   const [view, setView] = useState<"timeline" | "graph">("timeline");
 
   return (
@@ -45,9 +45,9 @@ export function WorkflowDetailSteps({ steps }: { steps: WorkflowStep[] }) {
 
       <Card className="p-2">
         {view === "timeline" ? (
-          <WorkflowStepTimeline steps={steps} />
+          <WorkflowStepTimeline steps={steps} animate={animate} />
         ) : (
-          <WorkflowGraphView steps={steps} />
+          <WorkflowGraphView steps={steps} animate={animate} />
         )}
       </Card>
     </section>

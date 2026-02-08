@@ -4,7 +4,7 @@ import { getWorkflowRun } from "@/lib/db/queries/workflows";
 /**
  * GET /api/workflows/[id]/progress
  * Poll the progress of a running workflow.
- * Returns the run, recent steps (last 10), and completion status.
+ * Returns the run, all steps, and completion status.
  */
 export async function GET(
   _req: Request,
@@ -17,8 +17,6 @@ export async function GET(
     return NextResponse.json({ error: "Workflow run not found" }, { status: 404 });
   }
 
-  // Return the last 10 steps for the progress display
-  const recentSteps = run.steps.slice(-10);
   const isComplete = ["completed", "failed", "cancelled"].includes(run.status);
 
   return NextResponse.json({
@@ -29,6 +27,7 @@ export async function GET(
       totalItems: run.totalItems,
       processedItems: run.processedItems,
       successItems: run.successItems,
+      skippedItems: run.skippedItems,
       errorItems: run.errorItems,
       model: run.model,
       inputTokens: run.inputTokens,
@@ -36,8 +35,10 @@ export async function GET(
       costUsd: run.costUsd,
       startedAt: run.startedAt,
       completedAt: run.completedAt,
+      config: run.config,
+      errors: run.errors,
     },
-    recentSteps,
+    steps: run.steps,
     isComplete,
     totalSteps: run.steps.length,
   });

@@ -20,6 +20,7 @@ import {
   Heart,
   ChevronDown,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 import type { WorkflowStep } from "@/lib/db/types";
 import { formatWorkflowError } from "@/lib/workflows/format-error";
@@ -182,9 +183,14 @@ function GraphNode({ step, isLast }: { step: WorkflowStep; isLast: boolean }) {
   );
 }
 
-export function WorkflowGraphView({ steps }: { steps: WorkflowStep[] }) {
+export function WorkflowGraphView({ steps, animate }: { steps: WorkflowStep[]; animate?: boolean }) {
   if (steps.length === 0) {
-    return (
+    return animate ? (
+      <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        Waiting for agent...
+      </div>
+    ) : (
       <p className="text-sm text-muted-foreground py-4">
         No steps recorded yet.
       </p>
@@ -194,7 +200,9 @@ export function WorkflowGraphView({ steps }: { steps: WorkflowStep[] }) {
   return (
     <div className="pl-2">
       {steps.map((step, i) => (
-        <GraphNode key={step.id} step={step} isLast={i === steps.length - 1} />
+        <div key={step.id} className={animate ? "animate-step-slide-in" : ""}>
+          <GraphNode step={step} isLast={i === steps.length - 1} />
+        </div>
       ))}
     </div>
   );

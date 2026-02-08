@@ -80,9 +80,14 @@ function parseJson(str: string | null): Record<string, unknown> | null {
   }
 }
 
-export function WorkflowStepTimeline({ steps }: { steps: WorkflowStep[] }) {
+export function WorkflowStepTimeline({ steps, animate }: { steps: WorkflowStep[]; animate?: boolean }) {
   if (steps.length === 0) {
-    return (
+    return animate ? (
+      <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        Waiting for agent...
+      </div>
+    ) : (
       <p className="text-sm text-muted-foreground py-4">
         No steps recorded yet.
       </p>
@@ -100,7 +105,7 @@ export function WorkflowStepTimeline({ steps }: { steps: WorkflowStep[] }) {
         return (
           <div
             key={step.id}
-            className="flex items-start gap-3 py-2 px-3 rounded-md hover:bg-muted/50 text-sm"
+            className={`flex items-start gap-3 py-2 px-3 rounded-md hover:bg-muted/50 text-sm${animate ? " animate-step-slide-in" : ""}`}
           >
             {/* Timestamp */}
             <span className="text-xs font-mono text-muted-foreground w-[70px] shrink-0 pt-0.5">
