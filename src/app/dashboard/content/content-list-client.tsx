@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { FileText, Download, Loader2, Heart, MessageCircle, Repeat2, Quote } from "lucide-react";
+import { FileText, Download, Loader2, Heart, MessageCircle, Repeat2, Quote, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import type { ContentItemWithPost } from "@/lib/db/types";
 
@@ -49,6 +49,7 @@ function ContentListInner({
   const router = useRouter();
   const searchParams = useSearchParams();
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
   const [syncResult, setSyncResult] = useState<{ type: string; added: number; skipped: number; errors: string[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -191,14 +192,14 @@ function ContentListInner({
           />
         </Card>
       ) : (
-        <div className="rounded-md border">
-          <Table>
+        <div className="rounded-md border overflow-hidden">
+          <Table className="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[45%]">Content</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Engagement</TableHead>
-                <TableHead>Date</TableHead>
+                <TableHead>Content</TableHead>
+                <TableHead className="w-28">Type</TableHead>
+                <TableHead className="w-36">Engagement</TableHead>
+                <TableHead className="w-32">Date</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -214,9 +215,56 @@ function ContentListInner({
                         {item.title && (
                           <p className="font-medium text-sm">{truncate(item.title, 60)}</p>
                         )}
-                        <p className="text-sm text-muted-foreground">
-                          {truncate(item.body, 120)}
-                        </p>
+                        <div className="text-sm text-muted-foreground break-words">
+                          {expandedItems.has(item.id) ? (
+                            <p className="whitespace-pre-wrap">{item.body ?? "—"}</p>
+                          ) : (
+                            <p>{truncate(item.body, 120)}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-1">
+                            {item.body && item.body.length > 120 && (
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                onClick={() => {
+                                  setExpandedItems((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(item.id)) {
+                                      next.delete(item.id);
+                                    } else {
+                                      next.add(item.id);
+                                    }
+                                    return next;
+                                  });
+                                }}
+                              >
+                                {expandedItems.has(item.id) ? (
+                                  <>
+                                    <ChevronUp className="h-3 w-3" />
+                                    Show less
+                                  </>
+                                ) : (
+                                  <>
+                                    <ChevronDown className="h-3 w-3" />
+                                    Show more
+                                  </>
+                                )}
+                              </button>
+                            )}
+                            {item.post?.platformUrl && (
+                              <Button variant="ghost" size="icon" className="h-6 w-6" asChild>
+                                <a
+                                  href={item.post.platformUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title="View on X"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              </Button>
+                            )}
+                          </div>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
