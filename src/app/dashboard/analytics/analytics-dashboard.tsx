@@ -75,7 +75,7 @@ export function AnalyticsDashboard() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabId)}>
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabId)} className="w-full">
           <div className="flex items-center justify-between w-full gap-4">
             <TabsList>
               <TabsTrigger value="overview">Overview</TabsTrigger>
