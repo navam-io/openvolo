@@ -17,6 +17,7 @@ import {
 import { FileText, Download, Loader2, Heart, MessageCircle, Repeat2, Quote, ExternalLink, ChevronDown, ChevronUp, PenSquare, Pencil } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { ComposeDialog } from "@/components/compose-dialog";
+import { PaginationControls } from "@/components/pagination-controls";
 import type { ContentItemWithPost } from "@/lib/db/types";
 
 const originFilters = [
@@ -40,6 +41,9 @@ const contentTypeLabels: Record<string, string> = {
 
 interface ContentListClientProps {
   content: ContentItemWithPost[];
+  total: number;
+  page: number;
+  pageSize: number;
   currentType?: string;
   currentOrigin?: string;
   currentStatus?: string;
@@ -47,6 +51,9 @@ interface ContentListClientProps {
 
 function ContentListInner({
   content,
+  total,
+  page,
+  pageSize,
   currentOrigin,
   currentStatus,
 }: ContentListClientProps) {
@@ -84,9 +91,23 @@ function ContentListInner({
           params.delete(key);
         }
       }
+      params.delete("page");
       router.push(`/dashboard/content?${params.toString()}`);
     },
     [router, searchParams]
+  );
+
+  const createPageUrl = useCallback(
+    (p: number) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (p > 1) {
+        params.set("page", String(p));
+      } else {
+        params.delete("page");
+      }
+      return `/dashboard/content?${params.toString()}`;
+    },
+    [searchParams]
   );
 
   async function handleSync(type: "tweets" | "mentions") {
@@ -379,6 +400,13 @@ function ContentListInner({
           </Table>
         </div>
       )}
+
+      <PaginationControls
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        createPageUrl={createPageUrl}
+      />
 
       {/* Compose dialog */}
       <ComposeDialog

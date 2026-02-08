@@ -43,3 +43,8 @@ export type Campaign = InferSelectModel<typeof campaigns>;
 export type AgentRun = InferSelectModel<typeof agentRuns>;
 export type Engagement = InferSelectModel<typeof engagements>;
 export type NewEngagement = InferInsertModel<typeof engagements>;
+
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+}

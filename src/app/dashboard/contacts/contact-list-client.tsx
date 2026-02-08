@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { AddContactDialog } from "@/components/add-contact-dialog";
 import { FunnelStageBadge } from "@/components/funnel-stage-badge";
 import { EnrichmentScoreBadge } from "@/components/enrichment-score-badge";
+import { PaginationControls } from "@/components/pagination-controls";
 import { Users } from "lucide-react";
 import type { ContactWithIdentities } from "@/lib/db/types";
 
@@ -37,12 +38,18 @@ const platformLabels: Record<string, string> = {
 
 interface ContactListClientProps {
   contacts: ContactWithIdentities[];
+  total: number;
+  page: number;
+  pageSize: number;
   currentSearch?: string;
   currentFunnelStage?: string;
 }
 
 export function ContactListClient({
   contacts,
+  total,
+  page,
+  pageSize,
   currentSearch,
   currentFunnelStage,
 }: ContactListClientProps) {
@@ -58,9 +65,23 @@ export function ContactListClient({
       } else {
         params.delete(key);
       }
+      params.delete("page");
       router.push(`/dashboard/contacts?${params.toString()}`);
     },
     [router, searchParams]
+  );
+
+  const createPageUrl = useCallback(
+    (p: number) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (p > 1) {
+        params.set("page", String(p));
+      } else {
+        params.delete("page");
+      }
+      return `/dashboard/contacts?${params.toString()}`;
+    },
+    [searchParams]
   );
 
   function handleSearchSubmit(e: React.FormEvent) {
@@ -180,6 +201,13 @@ export function ContactListClient({
           </Table>
         </div>
       )}
+
+      <PaginationControls
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        createPageUrl={createPageUrl}
+      />
     </div>
   );
 }

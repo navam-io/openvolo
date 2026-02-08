@@ -1,16 +1,20 @@
 import { listContacts } from "@/lib/db/queries/contacts";
+import { parsePaginationParams } from "@/lib/pagination";
 import { ContactListClient } from "./contact-list-client";
 
 export default async function ContactsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; funnelStage?: string; platform?: string }>;
+  searchParams: Promise<{ search?: string; funnelStage?: string; platform?: string; page?: string }>;
 }) {
   const params = await searchParams;
-  const contacts = listContacts({
+  const { page, pageSize } = parsePaginationParams(params);
+  const { data, total } = listContacts({
     search: params.search,
     funnelStage: params.funnelStage,
     platform: params.platform,
+    page,
+    pageSize,
   });
 
   return (
@@ -22,7 +26,10 @@ export default async function ContactsPage({
         </p>
       </div>
       <ContactListClient
-        contacts={contacts}
+        contacts={data}
+        total={total}
+        page={page}
+        pageSize={pageSize}
         currentSearch={params.search}
         currentFunnelStage={params.funnelStage}
       />

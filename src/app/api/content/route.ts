@@ -25,9 +25,11 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get("status") ?? undefined;
   const platformAccountId = searchParams.get("platformAccountId") ?? undefined;
   const threadId = searchParams.get("threadId") ?? undefined;
+  const page = parseInt(searchParams.get("page") ?? "1", 10) || 1;
+  const pageSize = parseInt(searchParams.get("pageSize") ?? "25", 10) || 25;
 
-  const results = listContentItems({ contentType, origin, platform, status, platformAccountId, threadId });
-  return NextResponse.json({ items: results });
+  const result = listContentItems({ contentType, origin, platform, status, platformAccountId, threadId, page, pageSize });
+  return NextResponse.json({ items: result.data, total: result.total });
 }
 
 export async function POST(req: NextRequest) {

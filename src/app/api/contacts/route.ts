@@ -45,9 +45,11 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get("search") ?? undefined;
   const funnelStage = searchParams.get("funnelStage") ?? undefined;
   const platform = searchParams.get("platform") ?? undefined;
+  const page = parseInt(searchParams.get("page") ?? "1", 10) || 1;
+  const pageSize = parseInt(searchParams.get("pageSize") ?? "25", 10) || 25;
 
-  const results = listContacts({ search, funnelStage, platform });
-  return NextResponse.json(results);
+  const result = listContacts({ search, funnelStage, platform, page, pageSize });
+  return NextResponse.json({ data: result.data, total: result.total });
 }
 
 export async function POST(req: NextRequest) {

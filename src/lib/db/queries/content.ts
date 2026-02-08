@@ -1,8 +1,8 @@
-import { eq, and, desc, SQL, like } from "drizzle-orm";
+import { eq, and, desc, count, SQL, like } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db } from "@/lib/db/client";
 import { contentItems, contentPosts, engagementMetrics } from "@/lib/db/schema";
-import type { ContentItem, NewContentItem, ContentPost, NewContentPost, ContentItemWithPost, EngagementMetric } from "@/lib/db/types";
+import type { ContentItem, NewContentItem, ContentPost, NewContentPost, ContentItemWithPost, EngagementMetric, PaginatedResult } from "@/lib/db/types";
 
 /** Attach post and latest metrics to content items (batch). */
 function attachPostsAndMetrics(items: ContentItem[]): ContentItemWithPost[] {
@@ -51,7 +51,9 @@ export function listContentItems(opts?: {
   status?: string;
   platformAccountId?: string;
   threadId?: string;
-}): ContentItemWithPost[] {
+  page?: number;
+  pageSize?: number;
+}): PaginatedResult<ContentItemWithPost> {
   const conditions: SQL[] = [];
 
   if (opts?.contentType) {
@@ -76,16 +78,38 @@ export function listContentItems(opts?: {
     conditions.push(eq(contentItems.threadId, opts.threadId));
   }
 
-  const query = db.select().from(contentItems);
-  let rows: ContentItem[];
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-  if (conditions.length > 0) {
-    rows = query.where(and(...conditions)).orderBy(desc(contentItems.createdAt)).all();
-  } else {
-    rows = query.orderBy(desc(contentItems.createdAt)).all();
+  // Skip pagination for thread lookups (ComposeDialog expects all thread items)
+  if (opts?.threadId) {
+    const rows = db
+      .select()
+      .from(contentItems)
+      .where(whereClause)
+      .orderBy(desc(contentItems.createdAt))
+      .all();
+    return { data: attachPostsAndMetrics(rows), total: rows.length };
   }
 
-  return attachPostsAndMetrics(rows);
+  const total = db
+    .select({ value: count() })
+    .from(contentItems)
+    .where(whereClause)
+    .get()?.value ?? 0;
+
+  const page = opts?.page ?? 1;
+  const pageSize = opts?.pageSize ?? 25;
+
+  const rows = db
+    .select()
+    .from(contentItems)
+    .where(whereClause)
+    .orderBy(desc(contentItems.createdAt))
+    .limit(pageSize)
+    .offset((page - 1) * pageSize)
+    .all();
+
+  return { data: attachPostsAndMetrics(rows), total };
 }
 
 export function getContentItem(id: string): ContentItemWithPost | undefined {

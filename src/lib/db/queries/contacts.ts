@@ -3,7 +3,7 @@ import { nanoid } from "nanoid";
 import { db } from "@/lib/db/client";
 import { contacts, contactIdentities } from "@/lib/db/schema";
 import { calculateEnrichmentScore } from "@/lib/db/enrichment";
-import type { Contact, NewContact, ContactWithIdentities } from "@/lib/db/types";
+import type { Contact, NewContact, ContactWithIdentities, PaginatedResult } from "@/lib/db/types";
 
 /** Split a full name into firstName/lastName on the first space. */
 function parseName(fullName: string): { firstName: string; lastName: string } {
@@ -55,7 +55,9 @@ export function listContacts(opts?: {
   search?: string;
   funnelStage?: string;
   platform?: string;
-}): ContactWithIdentities[] {
+  page?: number;
+  pageSize?: number;
+}): PaginatedResult<ContactWithIdentities> {
   const conditions: SQL[] = [];
 
   if (opts?.search) {
@@ -78,16 +80,27 @@ export function listContacts(opts?: {
     );
   }
 
-  const query = db.select().from(contacts);
-  let rows: Contact[];
+  const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
-  if (conditions.length > 0) {
-    rows = query.where(and(...conditions)).orderBy(desc(contacts.createdAt)).all();
-  } else {
-    rows = query.orderBy(desc(contacts.createdAt)).all();
-  }
+  const total = db
+    .select({ value: count() })
+    .from(contacts)
+    .where(whereClause)
+    .get()?.value ?? 0;
 
-  return attachIdentities(rows);
+  const page = opts?.page ?? 1;
+  const pageSize = opts?.pageSize ?? 25;
+
+  const rows = db
+    .select()
+    .from(contacts)
+    .where(whereClause)
+    .orderBy(desc(contacts.createdAt))
+    .limit(pageSize)
+    .offset((page - 1) * pageSize)
+    .all();
+
+  return { data: attachIdentities(rows), total };
 }
 
 export function getContactById(id: string): ContactWithIdentities | undefined {
