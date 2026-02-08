@@ -38,6 +38,15 @@ interface LinkedInConnectionState {
   grantedScopes: string;
 }
 
+interface GmailConnectionState {
+  loading: boolean;
+  connected: boolean;
+  displayName: string | null;
+  status: "active" | "paused" | "needs_reauth" | null;
+  lastSyncedAt: number | null;
+  grantedScopes: string;
+}
+
 interface SyncResultState {
   added: number;
   updated: number;
@@ -99,6 +108,22 @@ function SettingsContent() {
   const [liImporting, setLiImporting] = useState(false);
   const [liImportResult, setLiImportResult] = useState<SyncResultState | null>(null);
 
+  // Gmail connection state
+  const [gmState, setGmState] = useState<GmailConnectionState>({
+    loading: true,
+    connected: false,
+    displayName: null,
+    status: null,
+    lastSyncedAt: null,
+    grantedScopes: "",
+  });
+  const [gmConnecting, setGmConnecting] = useState(false);
+  const [gmSyncing, setGmSyncing] = useState(false);
+  const [gmDisconnecting, setGmDisconnecting] = useState(false);
+  const [gmSyncResult, setGmSyncResult] = useState<SyncResultState | null>(null);
+  const [gmMetaSyncing, setGmMetaSyncing] = useState(false);
+  const [gmMetaSyncResult, setGmMetaSyncResult] = useState<SyncResultState | null>(null);
+
   function fetchAuth() {
     fetch("/api/settings")
       .then((r) => r.json())
@@ -156,11 +181,30 @@ function SettingsContent() {
       });
   }
 
+  function fetchGmailStatus() {
+    fetch("/api/platforms/gmail")
+      .then((r) => r.json())
+      .then((data) => {
+        setGmState({
+          loading: false,
+          connected: data.connected,
+          displayName: data.account?.displayName ?? null,
+          status: data.account?.status ?? null,
+          lastSyncedAt: data.account?.lastSyncedAt ?? null,
+          grantedScopes: data.account?.grantedScopes ?? "",
+        });
+      })
+      .catch(() => {
+        setGmState((prev) => ({ ...prev, loading: false }));
+      });
+  }
+
   useEffect(() => {
     fetchAuth();
     fetchXStatus();
     fetchSyncStatus();
     fetchLinkedInStatus();
+    fetchGmailStatus();
   }, []);
 
   // Handle OAuth callback query params
@@ -175,6 +219,10 @@ function SettingsContent() {
     } else if (connected === "linkedin") {
       setSuccessMessage("LinkedIn account connected successfully!");
       fetchLinkedInStatus();
+      window.history.replaceState({}, "", "/dashboard/settings");
+    } else if (connected === "gmail") {
+      setSuccessMessage("Gmail account connected successfully!");
+      fetchGmailStatus();
       window.history.replaceState({}, "", "/dashboard/settings");
     } else if (oauthError) {
       setError(`OAuth error: ${oauthError}`);
@@ -395,6 +443,115 @@ function SettingsContent() {
     } finally {
       setLiSyncing(false);
     }
+  }
+
+  async function handleGmailConnect() {
+    setGmConnecting(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/platforms/gmail/auth");
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Failed to start Google OAuth flow");
+        return;
+      }
+
+      window.location.href = data.authUrl;
+    } catch {
+      setError("Failed to connect to Gmail");
+    } finally {
+      setGmConnecting(false);
+    }
+  }
+
+  async function handleGmailDisconnect() {
+    setGmDisconnecting(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/platforms/gmail", { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || "Failed to disconnect");
+        return;
+      }
+      setGmState({
+        loading: false,
+        connected: false,
+        displayName: null,
+        status: null,
+        lastSyncedAt: null,
+        grantedScopes: "",
+      });
+      setGmSyncResult(null);
+      setGmMetaSyncResult(null);
+    } catch {
+      setError("Failed to disconnect");
+    } finally {
+      setGmDisconnecting(false);
+    }
+  }
+
+  async function handleGmailSync() {
+    setGmSyncing(true);
+    setGmSyncResult(null);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/platforms/gmail/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "contacts" }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Gmail sync failed");
+        return;
+      }
+
+      setGmSyncResult(data.result);
+      fetchGmailStatus();
+    } catch {
+      setError("Gmail sync failed");
+    } finally {
+      setGmSyncing(false);
+    }
+  }
+
+  async function handleGmailMetadataSync() {
+    setGmMetaSyncing(true);
+    setGmMetaSyncResult(null);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/platforms/gmail/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "metadata" }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Gmail metadata sync failed");
+        return;
+      }
+
+      setGmMetaSyncResult(data.result);
+      fetchGmailStatus();
+    } catch {
+      setError("Gmail metadata sync failed");
+    } finally {
+      setGmMetaSyncing(false);
+    }
+  }
+
+  function getGmailConnectionStatus(): "disconnected" | "connected" | "needs_reauth" {
+    if (!gmState.connected) return "disconnected";
+    if (gmState.status === "needs_reauth") return "needs_reauth";
+    return "connected";
   }
 
   async function handleLinkedInCsvImport(file: File) {
@@ -814,6 +971,102 @@ function SettingsContent() {
               </div>
             )}
           </div>
+
+          <Separator />
+
+          {/* Gmail Connection */}
+          {gmState.loading ? (
+            <div className="flex items-center justify-center rounded-lg border p-4">
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <span className="text-sm text-muted-foreground">Loading Gmail status...</span>
+            </div>
+          ) : (
+            <PlatformConnectionCard
+              platform="gmail"
+              displayName="Gmail / Google"
+              accountHandle={gmState.displayName ?? undefined}
+              lastSyncedAt={gmState.lastSyncedAt}
+              status={getGmailConnectionStatus()}
+              syncCapable={true}
+              grantedScopes={gmState.grantedScopes || undefined}
+              onConnect={handleGmailConnect}
+              onDisconnect={handleGmailDisconnect}
+              onSync={handleGmailSync}
+              connecting={gmConnecting}
+              syncing={gmSyncing}
+              disconnecting={gmDisconnecting}
+            />
+          )}
+
+          {/* Gmail sync results */}
+          {gmSyncResult && (
+            <div className="rounded-lg border bg-muted/50 p-4 text-sm">
+              <p className="font-medium mb-1">Gmail Contact Sync Complete</p>
+              <div className="flex gap-4 text-muted-foreground">
+                <span>Added: {gmSyncResult.added}</span>
+                <span>Updated: {gmSyncResult.updated}</span>
+                <span>Skipped: {gmSyncResult.skipped}</span>
+              </div>
+              {gmSyncResult.errors.length > 0 && (
+                <div className="mt-2 text-destructive">
+                  <p className="font-medium">Errors:</p>
+                  <ul className="list-disc pl-4">
+                    {gmSyncResult.errors.map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Email Metadata Sync */}
+          {gmState.connected && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <h3 className="text-sm font-medium">Email Metadata Sync</h3>
+                <p className="text-xs text-muted-foreground">
+                  Enrich contacts with email interaction frequency (sent/received counts, last message date).
+                  No email content is stored.
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGmailMetadataSync}
+                  disabled={gmMetaSyncing}
+                >
+                  {gmMetaSyncing ? (
+                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Download className="mr-1 h-3 w-3" />
+                  )}
+                  {gmMetaSyncing ? "Syncing Metadata..." : "Sync Metadata"}
+                </Button>
+
+                {/* Metadata sync result */}
+                {gmMetaSyncResult && (
+                  <div className="rounded-lg border bg-muted/50 p-3 text-sm">
+                    <p className="font-medium mb-1">Metadata Sync Complete</p>
+                    <div className="flex gap-4 text-muted-foreground text-xs">
+                      <span>Updated: {gmMetaSyncResult.updated}</span>
+                      <span>Skipped: {gmMetaSyncResult.skipped}</span>
+                    </div>
+                    {gmMetaSyncResult.errors.length > 0 && (
+                      <div className="mt-2 text-destructive text-xs">
+                        <p className="font-medium">Errors:</p>
+                        <ul className="list-disc pl-4">
+                          {gmMetaSyncResult.errors.map((err, i) => (
+                            <li key={i}>{err}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

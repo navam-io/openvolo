@@ -12,6 +12,10 @@ export function getPlatformAdapter(platform: string): PlatformAdapter {
       const { LinkedInPlatformAdapter } = require("@/lib/platforms/linkedin/adapter");
       return new LinkedInPlatformAdapter();
     }
+    case "gmail": {
+      const { GmailPlatformAdapter } = require("@/lib/platforms/gmail/adapter");
+      return new GmailPlatformAdapter();
+    }
     default:
       throw new Error(`Platform "${platform}" is not yet supported`);
   }

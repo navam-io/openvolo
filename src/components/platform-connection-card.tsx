@@ -37,6 +37,15 @@ interface PlatformConnectionCardProps {
 
 /** Scope metadata: friendly label and capability group. */
 const SCOPE_META: Record<string, { label: string; group: string }> = {
+  // LinkedIn scopes
+  "openid": { label: "OpenID Connect", group: "Auth" },
+  "profile": { label: "Read Profile", group: "Profile" },
+  "email": { label: "Read Email", group: "Profile" },
+  "w_member_social": { label: "Create Posts", group: "Content" },
+  // Google scopes (full URLs — displayed as friendly labels)
+  "https://www.googleapis.com/auth/contacts.readonly": { label: "Read Contacts", group: "Contacts" },
+  "https://www.googleapis.com/auth/gmail.metadata": { label: "Email Metadata", group: "Email" },
+  // X scopes
   "tweet.read": { label: "Read Tweets", group: "Tweets" },
   "tweet.write": { label: "Write Tweets", group: "Tweets" },
   "tweet.moderate.write": { label: "Moderate Replies", group: "Tweets" },
@@ -60,7 +69,7 @@ const SCOPE_META: Record<string, { label: string; group: string }> = {
 };
 
 /** Group order for display. */
-const GROUP_ORDER = ["Tweets", "Users", "Engagement", "DMs", "Contacts", "Lists", "Moderation", "Other"];
+const GROUP_ORDER = ["Auth", "Profile", "Content", "Tweets", "Users", "Engagement", "Email", "DMs", "Contacts", "Lists", "Moderation", "Other"];
 
 /** Scopes that require Basic+ tier. */
 const BASIC_PLUS_SCOPES = new Set([
