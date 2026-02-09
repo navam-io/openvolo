@@ -1,6 +1,7 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Bot, User } from "lucide-react";
 import { ChatToolResult } from "@/components/chat/chat-tool-result";
 import { cn } from "@/lib/utils";
@@ -38,7 +39,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                     : "bg-muted"
                 )}
               >
-                <ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
                   {part.text}
                 </ReactMarkdown>
               </div>
