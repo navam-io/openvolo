@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/openvolo-logo-name.png" alt="OpenVolo" width="200" />
+  <img src="https://raw.githubusercontent.com/navam-io/openvolo/main/public/assets/openvolo-logo-name.png" alt="OpenVolo" width="200" />
 </p>
 
 <h3 align="center">Agentic AI-Native Social CRM</h3>
