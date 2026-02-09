@@ -44,6 +44,7 @@ export function ContactDetailClient({ contact, tasks }: ContactDetailClientProps
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const formChanges = useRef<Record<string, string>>({});
 
   async function handleSave() {
@@ -68,11 +69,15 @@ export function ContactDetailClient({ contact, tasks }: ContactDetailClientProps
 
   async function handleDelete() {
     setDeleting(true);
+    setDeleteError(null);
     try {
       const res = await fetch(`/api/contacts/${contact.id}`, { method: "DELETE" });
       if (res.ok) {
         router.push("/dashboard/contacts");
         router.refresh();
+      } else {
+        const body = await res.json().catch(() => null);
+        setDeleteError(body?.error ?? "Failed to delete contact. Please try again.");
       }
     } finally {
       setDeleting(false);
@@ -254,6 +259,9 @@ export function ContactDetailClient({ contact, tasks }: ContactDetailClientProps
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
+                {deleteError && (
+                  <p className="text-sm text-destructive">{deleteError}</p>
+                )}
                 <Button onClick={handleSave} disabled={saving}>
                   <Save className="mr-2 h-4 w-4" />
                   {saving ? "Saving..." : "Save Changes"}

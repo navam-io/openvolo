@@ -1,7 +1,7 @@
 import { eq, like, and, or, desc, count, inArray, SQL } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db } from "@/lib/db/client";
-import { contacts, contactIdentities } from "@/lib/db/schema";
+import { contacts, contactIdentities, contentItems, tasks, workflowSteps } from "@/lib/db/schema";
 import { calculateEnrichmentScore } from "@/lib/db/enrichment";
 import type { Contact, NewContact, ContactWithIdentities, PaginatedResult } from "@/lib/db/types";
 
@@ -157,7 +157,25 @@ export function deleteContact(id: string): boolean {
   const existing = db.select().from(contacts).where(eq(contacts.id, id)).get();
   if (!existing) return false;
 
-  db.delete(contacts).where(eq(contacts.id, id)).run();
+  db.transaction((tx) => {
+    // Unlink content items (nullable FK — preserve content, just remove contact reference)
+    tx.update(contentItems)
+      .set({ contactId: null })
+      .where(eq(contentItems.contactId, id))
+      .run();
+    // Delete tasks tied to this contact
+    tx.delete(tasks)
+      .where(eq(tasks.relatedContactId, id))
+      .run();
+    // Unlink workflow steps (nullable FK — preserve step history)
+    tx.update(workflowSteps)
+      .set({ contactId: null })
+      .where(eq(workflowSteps.contactId, id))
+      .run();
+    // Now safe to delete the contact (cascades handle identities, enrollments, engagements)
+    tx.delete(contacts).where(eq(contacts.id, id)).run();
+  });
+
   return true;
 }
 

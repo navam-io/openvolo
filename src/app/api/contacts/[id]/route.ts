@@ -64,9 +64,14 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const deleted = deleteContact(id);
-  if (!deleted) {
-    return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+  try {
+    const deleted = deleteContact(id);
+    if (!deleted) {
+      return NextResponse.json({ error: "Contact not found" }, { status: 404 });
+    }
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to delete contact";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
-  return new NextResponse(null, { status: 204 });
 }
