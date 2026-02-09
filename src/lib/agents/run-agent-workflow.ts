@@ -8,7 +8,7 @@ import {
   nextStepIndex,
 } from "@/lib/db/queries/workflows";
 import { getTemplate, updateTemplate } from "@/lib/db/queries/workflow-templates";
-import { listContacts } from "@/lib/db/queries/contacts";
+import { listContacts, createContact } from "@/lib/db/queries/contacts";
 import { urlFetch } from "@/lib/agents/tools/url-fetch";
 import { browserScrape } from "@/lib/agents/tools/browser-scrape";
 import { searchWeb } from "@/lib/agents/tools/search-web";
@@ -51,24 +51,26 @@ function buildSystemPrompt(
   return `${base}
 
 ## Tools Available
-- **search_web**: Search the internet (auto-routes between Brave and Tavily for optimal results)
+- **search_web**: Search the internet (auto-routes between Brave and Tavily for optimal results). Pass \`count\` to control how many results are returned.
 - **fetch_url**: Fetch and extract content from a web page URL
 - **scrape_url**: Use a headless browser to scrape JS-rendered pages
+- **create_contact**: Create a new contact in the CRM (use for each person you discover)
 - **enrich_contact**: Update an existing contact with new data (fill gaps only)
 - **report_progress**: Report progress during execution
 
 ## Guidelines
 - Always search first, then fetch relevant URLs for details
+- When you discover a person, ALWAYS use \`create_contact\` to save them to the CRM
 - When enriching contacts, use the "fill gaps, don't overwrite" strategy
+- Make multiple search queries with different angles to maximize result count
 - Report progress after completing each major step
-- Be thorough but efficient — avoid unnecessary tool calls
 - Return a summary of what you accomplished when done`;
 }
 
 function getDefaultPrompt(workflowType: WorkflowType): string {
   switch (workflowType) {
     case "search":
-      return "You are an AI research agent. Your goal is to find and gather information about people or topics from the web. Search for relevant profiles, articles, and data, then create or enrich contact records with what you find.";
+      return "You are an AI research agent. Your goal is to find people from the web and save each one as a contact in the CRM. For each person you discover, use `create_contact` to save them immediately. Make multiple search queries with different keywords and angles to reach the target result count. Pass the `count` parameter to `search_web` to get more results per query.";
     case "enrich":
       return "You are an AI enrichment agent. Your goal is to fill in missing information for existing contacts. Look up their profiles online, find their company, title, bio, and other details, then update the contact records.";
     case "prune":
@@ -115,7 +117,12 @@ function buildUserPrompt(
   // Include search-specific config
   if (config.workflowType === "search") {
     const maxResults = (config.config?.maxResults as number) ?? 20;
-    parts.push(`## Configuration\n- Maximum results to find: ${maxResults}`);
+    parts.push(`## Search Instructions
+- **Target: Find ${maxResults} people** and save each one using \`create_contact\`
+- Use \`count: ${maxResults}\` when calling \`search_web\` to request enough results per query
+- Make multiple varied search queries (different keywords, angles, sources) if the first search doesn't yield ${maxResults} people
+- For each person you find, call \`create_contact\` with their name and any available details (company, title, email, bio, etc.)
+- Report progress after every batch of contacts created`);
 
     const targetDomains = config.config?.targetDomains as string[] | undefined;
     if (targetDomains && targetDomains.length > 0) {
@@ -288,6 +295,68 @@ export async function runAgentWorkflow(
           execute: async (params) => {
             const { contactId, ...data } = params;
             return enrichContact(contactId, data, runId);
+          },
+        }),
+
+        create_contact: tool({
+          description:
+            "Create a new contact record in the CRM. Use this for each person you discover during search workflows. At minimum a name is required.",
+          inputSchema: z.object({
+            name: z.string().describe("Full name of the contact"),
+            email: z.string().optional().describe("Email address"),
+            company: z.string().optional().describe("Company name"),
+            title: z.string().optional().describe("Job title"),
+            headline: z.string().optional().describe("Professional headline"),
+            location: z.string().optional().describe("Location"),
+            website: z.string().optional().describe("Website URL"),
+            bio: z.string().optional().describe("Bio or summary"),
+            platform: z
+              .enum(["x", "linkedin", "gmail", "substack"])
+              .optional()
+              .describe("Primary platform"),
+            funnelStage: z
+              .enum(["prospect", "engaged", "qualified", "opportunity", "customer", "advocate"])
+              .optional()
+              .describe("Funnel stage (defaults to prospect)"),
+            tags: z
+              .array(z.string())
+              .optional()
+              .describe("Tags to categorize the contact"),
+          }),
+          execute: async ({ name, email, company, title, headline, location, website, bio, platform, funnelStage, tags }) => {
+            const contact = createContact({
+              name,
+              email: email ?? null,
+              company: company ?? null,
+              title: title ?? null,
+              headline: headline ?? null,
+              location: location ?? null,
+              website: website ?? null,
+              bio: bio ?? null,
+              platform: platform ?? "x",
+              funnelStage: funnelStage ?? "prospect",
+              tags: tags ? JSON.stringify(tags) : null,
+            });
+
+            createWorkflowStep({
+              workflowRunId: runId,
+              stepIndex: nextStepIndex(runId),
+              stepType: "contact_create",
+              status: "completed",
+              tool: "create_contact",
+              output: JSON.stringify({
+                contactId: contact.id,
+                name: contact.name,
+                enrichmentScore: contact.enrichmentScore,
+              }),
+            });
+
+            return {
+              id: contact.id,
+              name: contact.name,
+              enrichmentScore: contact.enrichmentScore,
+              message: `Contact "${contact.name}" created successfully.`,
+            };
           },
         }),
 
@@ -528,6 +597,65 @@ async function executeAgentLoop(
           execute: async (params) => {
             const { contactId, ...data } = params;
             return enrichContact(contactId, data, runId);
+          },
+        }),
+
+        create_contact: tool({
+          description:
+            "Create a new contact record in the CRM. Use this for each person you discover during search workflows.",
+          inputSchema: z.object({
+            name: z.string().describe("Full name of the contact"),
+            email: z.string().optional().describe("Email address"),
+            company: z.string().optional().describe("Company name"),
+            title: z.string().optional().describe("Job title"),
+            headline: z.string().optional().describe("Professional headline"),
+            location: z.string().optional().describe("Location"),
+            website: z.string().optional().describe("Website URL"),
+            bio: z.string().optional().describe("Bio or summary"),
+            platform: z
+              .enum(["x", "linkedin", "gmail", "substack"])
+              .optional()
+              .describe("Primary platform"),
+            funnelStage: z
+              .enum(["prospect", "engaged", "qualified", "opportunity", "customer", "advocate"])
+              .optional()
+              .describe("Funnel stage (defaults to prospect)"),
+            tags: z.array(z.string()).optional().describe("Tags to categorize the contact"),
+          }),
+          execute: async ({ name, email, company, title, headline, location, website, bio, platform, funnelStage, tags }) => {
+            const contact = createContact({
+              name,
+              email: email ?? null,
+              company: company ?? null,
+              title: title ?? null,
+              headline: headline ?? null,
+              location: location ?? null,
+              website: website ?? null,
+              bio: bio ?? null,
+              platform: platform ?? "x",
+              funnelStage: funnelStage ?? "prospect",
+              tags: tags ? JSON.stringify(tags) : null,
+            });
+
+            createWorkflowStep({
+              workflowRunId: runId,
+              stepIndex: nextStepIndex(runId),
+              stepType: "contact_create",
+              status: "completed",
+              tool: "create_contact",
+              output: JSON.stringify({
+                contactId: contact.id,
+                name: contact.name,
+                enrichmentScore: contact.enrichmentScore,
+              }),
+            });
+
+            return {
+              id: contact.id,
+              name: contact.name,
+              enrichmentScore: contact.enrichmentScore,
+              message: `Contact "${contact.name}" created successfully.`,
+            };
           },
         }),
 
