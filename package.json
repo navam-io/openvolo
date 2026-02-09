@@ -1,6 +1,6 @@
 {
   "name": "openvolo",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Agentic AI-Native Social CRM — manage X/Twitter and LinkedIn with Claude-powered agents",
   "type": "module",
   "bin": {
@@ -85,6 +85,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/manavsehgal/openvolo.git"
-  }
+    "url": "https://github.com/navam-io/openvolo.git"
+  },
+  "homepage": "https://openvolo.com/"
 }
