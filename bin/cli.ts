@@ -2,7 +2,7 @@ import { program } from "commander";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { homedir } from "os";
-import { mkdirSync, existsSync, readFileSync, unlinkSync, writeFileSync } from "fs";
+import { mkdirSync, existsSync, readFileSync, unlinkSync, writeFileSync, symlinkSync, realpathSync } from "fs";
 import { spawn } from "child_process";
 import { createServer } from "net";
 import Database from "better-sqlite3";
@@ -17,6 +17,16 @@ const pkg = JSON.parse(
 
 const DEFAULT_PORT = 3000;
 const DATA_DIR = join(homedir(), ".openvolo");
+
+function findLocalBin(name: string, fromDir: string): string {
+  let dir = fromDir;
+  while (dir !== dirname(dir)) {
+    const bin = join(dir, "node_modules", ".bin", name);
+    if (existsSync(bin)) return bin;
+    dir = dirname(dir);
+  }
+  return name; // fallback: rely on PATH
+}
 
 function ensureDataDir() {
   const dirs = [DATA_DIR, join(DATA_DIR, "sessions"), join(DATA_DIR, "media")];
@@ -108,18 +118,46 @@ async function startApp(port: number) {
   // Start Next.js dev server
   const appDir = join(__dirname, "..");
 
-  // Ensure npm config files exist so Next.js uses npm (not pnpm) for auto-installs
-  // and legacy-peer-deps avoids the zod v3/v4 peer conflict
-  const lockPath = join(appDir, "package-lock.json");
-  if (!existsSync(lockPath)) {
-    writeFileSync(lockPath, JSON.stringify({ lockfileVersion: 3 }));
-  }
+  // Ensure .npmrc exists for legacy-peer-deps (zod v3/v4 peer conflict)
   const npmrcPath = join(appDir, ".npmrc");
   if (!existsSync(npmrcPath)) {
     writeFileSync(npmrcPath, "legacy-peer-deps=true\n");
   }
 
-  const nextBin = join(__dirname, "..", "node_modules", ".bin", "next");
+  // When installed via npx, npm hoists dependencies above the package dir.
+  // Turbopack can't find `next` from the package dir, so we symlink
+  // the hoisted node_modules into the package if needed.
+  const localNm = join(appDir, "node_modules");
+  if (!existsSync(join(localNm, "next", "package.json"))) {
+    // Find the hoisted node_modules containing `next`
+    let searchDir = dirname(appDir);
+    while (searchDir !== dirname(searchDir)) {
+      const candidate = join(searchDir, "node_modules", "next", "package.json");
+      if (existsSync(candidate)) {
+        const hoistedNm = join(searchDir, "node_modules");
+        // Symlink hoisted packages into local node_modules
+        if (!existsSync(localNm)) {
+          mkdirSync(localNm);
+        }
+        // Symlink `next` so Turbopack can resolve it
+        const nextLink = join(localNm, "next");
+        if (!existsSync(nextLink)) {
+          symlinkSync(join(hoistedNm, "next"), nextLink);
+        }
+        // Symlink `react` and `react-dom` to prevent duplicate copies
+        for (const pkg of ["react", "react-dom"]) {
+          const link = join(localNm, pkg);
+          if (!existsSync(link) && existsSync(join(hoistedNm, pkg))) {
+            symlinkSync(join(hoistedNm, pkg), link);
+          }
+        }
+        break;
+      }
+      searchDir = dirname(searchDir);
+    }
+  }
+
+  const nextBin = findLocalBin("next", appDir);
   const child = spawn(nextBin, ["dev", "--turbopack", "--port", String(actualPort)], {
     cwd: appDir,
     stdio: "inherit",
