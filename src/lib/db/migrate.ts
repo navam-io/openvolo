@@ -1,9 +1,12 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { migrate } from "drizzle-orm/better-sqlite3/migrator";
-import { join } from "path";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 import { homedir } from "os";
 import { mkdirSync, existsSync } from "fs";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export function runMigrations(dataDir?: string) {
   const dir = dataDir ?? join(homedir(), ".openvolo");
@@ -20,7 +23,7 @@ export function runMigrations(dataDir?: string) {
   const db = drizzle(sqlite);
 
   // Run migrations from the migrations directory
-  const migrationsDir = join(import.meta.dirname, "migrations");
+  const migrationsDir = join(__dirname, "migrations");
   if (existsSync(migrationsDir)) {
     migrate(db, { migrationsFolder: migrationsDir });
   }

@@ -1,14 +1,18 @@
-#!/usr/bin/env node
-
 import { program } from "commander";
-import { join } from "path";
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 import { homedir } from "os";
-import { mkdirSync, existsSync } from "fs";
-import { execSync, spawn } from "child_process";
-import { readFileSync } from "fs";
+import { mkdirSync, existsSync, readFileSync, unlinkSync, writeFileSync } from "fs";
+import { spawn } from "child_process";
+import { createServer } from "net";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import { migrate } from "drizzle-orm/better-sqlite3/migrator";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const pkg = JSON.parse(
-  readFileSync(join(import.meta.dirname, "..", "package.json"), "utf-8")
+  readFileSync(join(__dirname, "..", "package.json"), "utf-8")
 );
 
 const DEFAULT_PORT = 3000;
@@ -26,7 +30,6 @@ function ensureDataDir() {
 
 function findAvailablePort(preferred: number): Promise<number> {
   return new Promise((resolve) => {
-    const { createServer } = require("net") as typeof import("net");
     const server = createServer();
     server.listen(preferred, () => {
       server.close(() => resolve(preferred));
@@ -48,13 +51,15 @@ async function startApp(port: number) {
   // Run database migrations
   console.log("\n  Initializing database...");
   try {
-    // Use drizzle-kit push for development (creates tables from schema)
-    const appDir = join(import.meta.dirname, "..");
-    execSync("npx drizzle-kit push --force", {
-      cwd: appDir,
-      stdio: "pipe",
-      env: { ...process.env, OPENVOLO_DATA_DIR: DATA_DIR },
-    });
+    // Apply SQL migrations programmatically (works inside node_modules)
+    const dbPath = join(DATA_DIR, "data.db");
+    const sqlite = new Database(dbPath);
+    sqlite.pragma("journal_mode = WAL");
+    sqlite.pragma("foreign_keys = ON");
+    const db = drizzle(sqlite);
+    const migrationsDir = join(__dirname, "..", "src", "lib", "db", "migrations");
+    migrate(db, { migrationsFolder: migrationsDir });
+    sqlite.close();
     console.log("  Database ready ✓");
 
     // Run identity data migration (safe to call repeatedly)
@@ -101,8 +106,21 @@ async function startApp(port: number) {
   console.log(`\n  Starting server on http://localhost:${actualPort}...\n`);
 
   // Start Next.js dev server
-  const appDir = join(import.meta.dirname, "..");
-  const child = spawn("npx", ["next", "dev", "--turbopack", "--port", String(actualPort)], {
+  const appDir = join(__dirname, "..");
+
+  // Ensure npm config files exist so Next.js uses npm (not pnpm) for auto-installs
+  // and legacy-peer-deps avoids the zod v3/v4 peer conflict
+  const lockPath = join(appDir, "package-lock.json");
+  if (!existsSync(lockPath)) {
+    writeFileSync(lockPath, JSON.stringify({ lockfileVersion: 3 }));
+  }
+  const npmrcPath = join(appDir, ".npmrc");
+  if (!existsSync(npmrcPath)) {
+    writeFileSync(npmrcPath, "legacy-peer-deps=true\n");
+  }
+
+  const nextBin = join(__dirname, "..", "node_modules", ".bin", "next");
+  const child = spawn(nextBin, ["dev", "--turbopack", "--port", String(actualPort)], {
     cwd: appDir,
     stdio: "inherit",
     env: { ...process.env, OPENVOLO_DATA_DIR: DATA_DIR, PORT: String(actualPort) },
@@ -141,7 +159,6 @@ program
     if (opts.reset) {
       const dbPath = join(DATA_DIR, "data.db");
       if (existsSync(dbPath)) {
-        const { unlinkSync } = require("fs") as typeof import("fs");
         unlinkSync(dbPath);
         // Also remove WAL and SHM files
         try { unlinkSync(dbPath + "-wal"); } catch {}
