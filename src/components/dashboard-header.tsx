@@ -2,10 +2,11 @@
 
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
-import { Sun, Moon, Search } from "lucide-react";
+import { Sun, Moon } from "lucide-react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
+import { ChatTrigger } from "@/components/chat/chat-trigger";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -71,15 +72,7 @@ export function DashboardHeader() {
       <Separator orientation="vertical" className="mr-2 h-4" />
       <Breadcrumb />
       <div className="ml-auto flex items-center gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-9 w-9 rounded-full text-muted-foreground"
-          disabled
-        >
-          <Search className="h-4 w-4" />
-          <span className="sr-only">Search</span>
-        </Button>
+        <ChatTrigger />
         <ThemeToggle />
       </div>
     </header>
