@@ -8,7 +8,7 @@ import {
   nextStepIndex,
 } from "@/lib/db/queries/workflows";
 import { getTemplate, updateTemplate } from "@/lib/db/queries/workflow-templates";
-import { listContacts, createContact } from "@/lib/db/queries/contacts";
+import { listContacts, createContact, findContactByNameOrEmail } from "@/lib/db/queries/contacts";
 import { urlFetch } from "@/lib/agents/tools/url-fetch";
 import { browserScrape } from "@/lib/agents/tools/browser-scrape";
 import { searchWeb } from "@/lib/agents/tools/search-web";
@@ -127,6 +127,13 @@ function buildUserPrompt(
     const targetDomains = config.config?.targetDomains as string[] | undefined;
     if (targetDomains && targetDomains.length > 0) {
       parts.push(`- Focus on these domains: ${targetDomains.join(", ")}`);
+    }
+
+    // Include existing contacts so the agent skips known people
+    const existingContacts = listContacts({ pageSize: 200 });
+    if (existingContacts.data.length > 0) {
+      const names = existingContacts.data.map((c) => c.name).join(", ");
+      parts.push(`## Existing Contacts (skip these — already in CRM)\n${names}\n\nDo NOT call \`create_contact\` for anyone in this list. Focus on finding net-new people.`);
     }
   }
 
@@ -324,6 +331,31 @@ export async function runAgentWorkflow(
               .describe("Tags to categorize the contact"),
           }),
           execute: async ({ name, email, company, title, headline, location, website, bio, platform, funnelStage, tags }) => {
+            // Dedup: check if contact already exists by email or name
+            const existing = findContactByNameOrEmail(name, email);
+            if (existing) {
+              const matchedBy = email && existing.email === email ? "email" : "name";
+              createWorkflowStep({
+                workflowRunId: runId,
+                stepIndex: nextStepIndex(runId),
+                stepType: "contact_create",
+                status: "skipped",
+                tool: "create_contact",
+                output: JSON.stringify({
+                  contactId: existing.id,
+                  name: existing.name,
+                  matchedBy,
+                  reason: "duplicate",
+                }),
+              });
+              return {
+                id: existing.id,
+                name: existing.name,
+                enrichmentScore: existing.enrichmentScore,
+                message: `Contact already exists (matched by ${matchedBy}). Skipped creation.`,
+              };
+            }
+
             const contact = createContact({
               name,
               email: email ?? null,
@@ -623,6 +655,31 @@ async function executeAgentLoop(
             tags: z.array(z.string()).optional().describe("Tags to categorize the contact"),
           }),
           execute: async ({ name, email, company, title, headline, location, website, bio, platform, funnelStage, tags }) => {
+            // Dedup: check if contact already exists by email or name
+            const existing = findContactByNameOrEmail(name, email);
+            if (existing) {
+              const matchedBy = email && existing.email === email ? "email" : "name";
+              createWorkflowStep({
+                workflowRunId: runId,
+                stepIndex: nextStepIndex(runId),
+                stepType: "contact_create",
+                status: "skipped",
+                tool: "create_contact",
+                output: JSON.stringify({
+                  contactId: existing.id,
+                  name: existing.name,
+                  matchedBy,
+                  reason: "duplicate",
+                }),
+              });
+              return {
+                id: existing.id,
+                name: existing.name,
+                enrichmentScore: existing.enrichmentScore,
+                message: `Contact already exists (matched by ${matchedBy}). Skipped creation.`,
+              };
+            }
+
             const contact = createContact({
               name,
               email: email ?? null,

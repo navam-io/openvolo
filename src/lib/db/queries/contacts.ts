@@ -1,4 +1,4 @@
-import { eq, like, and, or, desc, count, inArray, SQL } from "drizzle-orm";
+import { eq, like, and, or, desc, count, inArray, sql, SQL } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db } from "@/lib/db/client";
 import { contacts, contactIdentities, contentItems, tasks, workflowSteps } from "@/lib/db/schema";
@@ -107,6 +107,29 @@ export function getContactById(id: string): ContactWithIdentities | undefined {
   const row = db.select().from(contacts).where(eq(contacts.id, id)).get();
   if (!row) return undefined;
   return attachIdentities([row])[0];
+}
+
+/**
+ * Find an existing contact by exact email match or case-insensitive name match.
+ * Email takes priority (more reliable). Returns undefined if no match.
+ */
+export function findContactByNameOrEmail(
+  name: string,
+  email?: string | null
+): ContactWithIdentities | undefined {
+  // Try exact email match first (most reliable identifier)
+  if (email) {
+    const byEmail = db.select().from(contacts).where(eq(contacts.email, email)).get();
+    if (byEmail) return attachIdentities([byEmail])[0];
+  }
+  // Fall back to case-insensitive exact name match
+  const byName = db
+    .select()
+    .from(contacts)
+    .where(sql`lower(${contacts.name}) = lower(${name})`)
+    .get();
+  if (byName) return attachIdentities([byName])[0];
+  return undefined;
 }
 
 export function createContact(data: Omit<NewContact, "id">): ContactWithIdentities {
