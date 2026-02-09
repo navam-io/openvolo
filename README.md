@@ -12,7 +12,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: Apache 2.0" src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" /></a>
-  <img alt="Node 18+" src="https://img.shields.io/badge/Node-18%2B-green.svg" />
+  <img alt="Node 20+" src="https://img.shields.io/badge/Node-20%2B-green.svg" />
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.8-blue.svg" />
   <img alt="Next.js 16" src="https://img.shields.io/badge/Next.js-16.1-black.svg" />
 </p>
@@ -32,7 +32,7 @@
 ## Features
 
 ### Contact Management
-Unified contacts across platforms with automatic cross-platform deduplication. Enrichment scoring (0-100) based on profile completeness, and funnel stage tracking from lead to customer.
+Unified contacts across platforms with automatic cross-platform deduplication. Enrichment scoring (0-100) based on profile completeness and identity count, funnel stage tracking from lead to customer.
 
 ### X/Twitter Integration
 OAuth 2.0 authentication, contact sync from followers/following, tweet and mention import with cursor-based pagination, compose and publish tweets, thread support, and engagement actions (like, retweet, reply).
@@ -44,13 +44,28 @@ OAuth 2.0 with OpenID Connect, profile sync, and CSV import for connections (no 
 Google People API contact sync with 2-tier deduplication (identity match then email match). Email metadata enrichment tracks message frequency (sent/received in last 30 days) per contact — no email content is stored.
 
 ### Content Library
-Import tweets and mentions, compose new posts, draft and publish workflow with thread support. Engagement metrics tracked over time with both JSON snapshots (fast display) and structured rows (time-series analysis).
+Import tweets and mentions, compose new posts, draft and publish workflow with thread support. Six content types (post, thread, article, newsletter, DM, reply). Engagement metrics tracked over time with both JSON snapshots (fast display) and structured rows (time-series analysis).
 
 ### Task Management
 Create, update, and track tasks with status and priority. Link tasks to contacts for relationship-aware workflows.
 
-### AI Agents (Foundation)
-Two-tier AI architecture with agent run tracking. Vercel AI SDK powers the chat UI, Claude Agent SDK handles background automation.
+### Workflow Engine
+Six workflow types: sync, enrich, search, prune, sequence, and agent. Template gallery with 7 seed templates, activation dialog for quick setup. Four visualization modes (list, kanban, swimlane, graph) with run/step observability and per-step cost tracking.
+
+### AI Agent Runner
+Five agent tools — url-fetch (Cheerio), browser-scrape (Playwright), search-web (Brave + Tavily), enrich-contact, and update-progress. Domain-based routing engine (e.g. x.com → browser, wikipedia → fetch) with automatic escalation on failure.
+
+### Smart Search
+Dual search providers: Brave for broad discovery, Tavily for deep research. Intelligent routing by workflow type and query patterns with automatic failover. Combined 3,000 free queries/month across both providers.
+
+### Analytics Dashboard
+Five-tab dashboard — Overview, Agents, Engagement, Content, Sync Health. Six reusable chart components (area, bar, donut, ranked table, stat cards, skeleton). Time range filtering across all tabs.
+
+### AI Chat Assistant
+Streaming chat panel (Cmd+K) powered by Vercel AI SDK 6. Eight CRM tools for querying contacts, analytics, workflows, and content — plus creating contacts, tasks, and starting workflows — all conversationally. Page-aware context injection adapts responses to your current view.
+
+### Browser Enrichment
+Playwright-based profile scraping with anti-detection measures, LLM-powered field extraction, and session persistence for authenticated scraping.
 
 ### Privacy & Security
 AES-256 encrypted credential storage. All data stored locally in SQLite — no cloud dependency, no data leaves your machine.
@@ -82,6 +97,10 @@ LINKEDIN_CLIENT_SECRET=
 # Gmail / Google Contacts (optional)
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
+
+# Web search (optional — for agent workflows)
+BRAVE_SEARCH_API_KEY=
+TAVILY_API_KEY=
 ```
 
 ## Platform Setup
@@ -112,6 +131,10 @@ GOOGLE_CLIENT_SECRET=
 | Database | SQLite (better-sqlite3), Drizzle ORM 0.45 |
 | AI | Vercel AI SDK 6, Anthropic SDK, Claude Agent SDK |
 | UI | Tailwind CSS 4, shadcn/ui (Radix), Lucide Icons |
+| Charts | Recharts (via shadcn/ui chart component) |
+| Browser | Playwright (enrichment scraping) |
+| Parsing | Cheerio (HTML), Tiptap (rich text editor) |
+| Drag & Drop | @dnd-kit (kanban, swimlane views) |
 | Testing | Vitest |
 | Validation | Zod 3.24 |
 
@@ -126,13 +149,16 @@ src/
       content/                        #   Content CRUD
       platforms/                      #   X, LinkedIn, Gmail auth + sync
       tasks/                          #   Task CRUD
-      ai/                             #   AI chat endpoint
+      chat/                           #   AI chat streaming endpoint
+      analytics/                      #   Analytics endpoints (5 tabs)
+      workflows/                      #   Workflow CRUD + templates + agent runs
     dashboard/                        # UI routes
       contacts/                       #   Contact list + detail
       content/                        #   Content list + detail + compose
-      settings/                       #   Platform connections
+      workflows/                      #   Workflow list + detail + template gallery
+      analytics/                      #   Analytics dashboard (5-tab)
+      settings/                       #   Platform connections + search API keys
       help/                           #   Setup guides
-      agents/                         #   Agent runs
   lib/
     db/
       schema.ts                       # All database tables (Drizzle)
@@ -142,8 +168,15 @@ src/
       x/                              # X/Twitter client, mappers, adapter
       linkedin/                       # LinkedIn client, mappers, adapter
       gmail/                          # Gmail/Google client, mappers, adapter
+    workflows/                        # Workflow types, sync wrapper
+    agents/                           # Agent tools, runner, routing engine
+    chat/                             # Chat types, system prompt, 8 CRM tools
+    browser/                          # Browser enrichment (Playwright, anti-detection)
+    analytics/                        # Analytics utilities (time range, formatting)
     auth/                             # AES-256 crypto + API key management
   components/                         # Shared UI components (shadcn/ui based)
+    charts/                           #   Reusable chart components (area, bar, donut, ...)
+    chat/                             #   Chat panel, message, input, tool results
 ```
 
 ## Development
@@ -163,12 +196,11 @@ npm run lint             # ESLint
 
 - [x] **Phase 0** — Project setup, CLI, schema, auth, UI shell
 - [x] **Phase 1** — Contact CRUD, Task CRUD, Dashboard, Identities, Enrichment, X/Twitter
-- [x] **Phase 2 (Sprints 1-2)** — Content Foundation, Detail, Compose, Thread
-- [x] **LinkedIn Integration** — OAuth, Profile Sync, CSV Import
-- [x] **Gmail Integration** — OAuth, Contact Sync, Email Metadata
-- [ ] **Phase 2 (Sprint 3)** — AI Chat + Direct Messages
-- [ ] **Phase 3** — Campaign workflows, automated sequences
-- [ ] **Phase 4+** — Multi-user support, Substack integration, advanced agents
+- [x] **Phase 2** — Content Library, LinkedIn + Gmail Integration, Browser Enrichment
+- [x] **Phase 3** — Unified Workflows, Agent Runner, Smart Search Routing
+- [x] **Phase 4** — Analytics Dashboard (5-tab with charts)
+- [x] **Phase 5** — AI Chat Assistant (8 CRM tools, streaming)
+- [ ] **Phase 6** — Multi-user support, Substack integration, advanced agents
 
 ## License
 
