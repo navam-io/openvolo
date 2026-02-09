@@ -2,7 +2,7 @@ import { program } from "commander";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { homedir } from "os";
-import { mkdirSync, existsSync, readFileSync, unlinkSync, writeFileSync, symlinkSync, realpathSync } from "fs";
+import { mkdirSync, existsSync, readFileSync, unlinkSync, writeFileSync, cpSync } from "fs";
 import { spawn } from "child_process";
 import { createServer } from "net";
 import Database from "better-sqlite3";
@@ -125,41 +125,46 @@ async function startApp(port: number) {
   }
 
   // When installed via npx, npm hoists dependencies above the package dir.
-  // Turbopack can't find `next` from the package dir, so we symlink
-  // the hoisted node_modules into the package if needed.
+  // Turbopack can't resolve deps outside its project root and won't follow
+  // directory symlinks. Strategy: copy source + config into the hoisted root
+  // so Turbopack sees a normal project with node_modules in the same dir.
   const localNm = join(appDir, "node_modules");
+  let effectiveCwd = appDir;
+
   if (!existsSync(join(localNm, "next", "package.json"))) {
     // Find the hoisted node_modules containing `next`
     let searchDir = dirname(appDir);
     while (searchDir !== dirname(searchDir)) {
       const candidate = join(searchDir, "node_modules", "next", "package.json");
       if (existsSync(candidate)) {
-        const hoistedNm = join(searchDir, "node_modules");
-        // Symlink hoisted packages into local node_modules
-        if (!existsSync(localNm)) {
-          mkdirSync(localNm);
-        }
-        // Symlink `next` so Turbopack can resolve it
-        const nextLink = join(localNm, "next");
-        if (!existsSync(nextLink)) {
-          symlinkSync(join(hoistedNm, "next"), nextLink);
-        }
-        // Symlink `react` and `react-dom` to prevent duplicate copies
-        for (const pkg of ["react", "react-dom"]) {
-          const link = join(localNm, pkg);
-          if (!existsSync(link) && existsSync(join(hoistedNm, pkg))) {
-            symlinkSync(join(hoistedNm, pkg), link);
+        const hoistedRoot = searchDir;
+
+        // Copy source and config into hoisted root (fast — ~2MB of source files)
+        for (const name of ["src", "public"]) {
+          const dest = join(hoistedRoot, name);
+          const src = join(appDir, name);
+          if (!existsSync(dest) && existsSync(src)) {
+            cpSync(src, dest, { recursive: true });
           }
         }
+        for (const name of ["next.config.mjs", "tsconfig.json", "postcss.config.mjs", "package.json"]) {
+          const dest = join(hoistedRoot, name);
+          const src = join(appDir, name);
+          if (!existsSync(dest) && existsSync(src)) {
+            writeFileSync(dest, readFileSync(src));
+          }
+        }
+
+        effectiveCwd = hoistedRoot;
         break;
       }
       searchDir = dirname(searchDir);
     }
   }
 
-  const nextBin = findLocalBin("next", appDir);
+  const nextBin = findLocalBin("next", effectiveCwd);
   const child = spawn(nextBin, ["dev", "--turbopack", "--port", String(actualPort)], {
-    cwd: appDir,
+    cwd: effectiveCwd,
     stdio: "inherit",
     env: { ...process.env, OPENVOLO_DATA_DIR: DATA_DIR, PORT: String(actualPort) },
   });
