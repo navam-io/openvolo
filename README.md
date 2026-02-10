@@ -44,16 +44,22 @@ OAuth 2.0 with OpenID Connect, profile sync, and CSV import for connections (no 
 Google People API contact sync with 2-tier deduplication (identity match then email match). Email metadata enrichment tracks message frequency (sent/received in last 30 days) per contact — no email content is stored.
 
 ### Content Library
-Import tweets and mentions, compose new posts, draft and publish workflow with thread support. Six content types (post, thread, article, newsletter, DM, reply). Engagement metrics tracked over time with both JSON snapshots (fast display) and structured rows (time-series analysis).
+Import tweets and mentions, compose new posts, draft and publish workflow with thread support. Six content types (post, thread, article, newsletter, DM, reply). AI-powered draft generation via the `save-draft` agent tool. Engagement metrics tracked over time with both JSON snapshots (fast display) and structured rows (time-series analysis).
 
 ### Task Management
 Create, update, and track tasks with status and priority. Link tasks to contacts for relationship-aware workflows.
 
 ### Workflow Engine
-Six workflow types: sync, enrich, search, prune, sequence, and agent. Template gallery with 7 seed templates, activation dialog for quick setup. Four visualization modes (list, kanban, swimlane, graph) with run/step observability and per-step cost tracking.
+Six workflow types: sync, enrich, search, prune, sequence, and agent. Template gallery with 10 seed templates (3 search, 3 enrich, 2 prune, plus user-created), activation dialog for quick setup. User template builder lets you clone any system template and customize it. Four visualization modes (list, kanban, swimlane, graph) with run/step observability and per-step cost tracking. Cron-based workflow scheduling with presets, custom expressions, and a 60-second background runner.
 
 ### AI Agent Runner
-Five agent tools — url-fetch (Cheerio), browser-scrape (Playwright), search-web (Brave + Tavily), enrich-contact, and update-progress. Domain-based routing engine (e.g. x.com → browser, wikipedia → fetch) with automatic escalation on failure.
+Eight agent tools — url-fetch (Cheerio), browser-scrape (Playwright), search-web (Brave + Tavily), enrich-contact, update-progress, archive-contact (prune workflows), save-draft (AI content generation), and engage-post (template-driven engagement). Domain-based routing engine (e.g. x.com → browser, wikipedia → fetch) with automatic escalation on failure.
+
+### Prune & Archive
+Metadata-based contact archiving from prune workflows — contacts are soft-archived (restorable, not deleted). Archive and restore from workflow detail or individual contact pages. "Show Archived" toggle in the contacts list with visual indicators for archived rows.
+
+### Workflow Scheduling
+Cron-based scheduling with common presets (hourly, daily, weekly) and custom cron expressions. Next-run preview and per-template config overrides. Auto-execution via a 60-second background runner initialized through Next.js instrumentation.
 
 ### Smart Search
 Dual search providers: Brave for broad discovery, Tavily for deep research. Intelligent routing by workflow type and query patterns with automatic failover. Combined 3,000 free queries/month across both providers.
@@ -136,12 +142,14 @@ TAVILY_API_KEY=
 | Parsing | Cheerio (HTML), Tiptap (rich text editor) |
 | Drag & Drop | @dnd-kit (kanban, swimlane views) |
 | Testing | Vitest |
+| Scheduling | cron-parser (cron expression parsing) |
 | Validation | Zod 3.24 |
 
 ## Project Structure
 
 ```
 bin/cli.ts                            # npx entry point
+instrumentation.ts                    # Next.js instrumentation hook (scheduler init)
 src/
   app/
     api/                              # API routes
@@ -173,6 +181,7 @@ src/
     chat/                             # Chat types, system prompt, 8 CRM tools, smart prompts
     browser/                          # Browser enrichment (Playwright, anti-detection)
     analytics/                        # Analytics utilities (time range, formatting)
+    scheduler/                        # Background scheduler runner (60s interval)
     auth/                             # AES-256 crypto + API key management
   components/                         # Shared UI components (shadcn/ui based)
     charts/                           #   Reusable chart components (area, bar, donut, ...)
@@ -197,10 +206,10 @@ npm run lint             # ESLint
 - [x] **Phase 0** — Project setup, CLI, schema, auth, UI shell
 - [x] **Phase 1** — Contact CRUD, Task CRUD, Dashboard, Identities, Enrichment, X/Twitter
 - [x] **Phase 2** — Content Library, LinkedIn + Gmail Integration, Browser Enrichment
-- [x] **Phase 3** — Unified Workflows, Agent Runner, Smart Search Routing
+- [x] **Phase 3** — Unified Workflows, Agent Runner, Smart Search Routing, Prune Execution, Workflow Scheduling
 - [x] **Phase 4** — Analytics Dashboard (5-tab with charts)
 - [x] **Phase 5** — AI Chat Assistant (8 CRM tools, streaming, smart prompts, conversation history)
-- [ ] **Phase 6** — Multi-user support, Substack integration, advanced agents
+- [ ] **Phase 6** — Content & Demand Gen (media system, browser publishing, AI content creation, goals, user templates — 6E complete)
 
 ## License
 
