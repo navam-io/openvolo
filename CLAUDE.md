@@ -1,7 +1,7 @@
 # CLAUDE.md — OpenVolo
 
 Agentic AI-Native Social CRM for X/Twitter + LinkedIn with Claude-powered agents.
-Boot with `npx openvolo` — starts Next.js 16 + SQLite + Claude Agent SDK.
+Boot with `npx openvolo` — starts Next.js 16 + SQLite + Vercel AI SDK.
 
 ## Commands
 
@@ -23,7 +23,7 @@ npx shadcn@latest add <component>  # Add shadcn/ui component (requires .npmrc le
 
 **Rendering boundary**: Server Components call DB directly (sync). Client Components call API routes via fetch.
 
-**Two-tier AI**: Vercel AI SDK 6 for UI chat streaming, Claude Agent SDK for background agents.
+**AI**: Vercel AI SDK 6 for both UI chat streaming and background agent workflows.
 
 **Data**: SQLite at `~/.openvolo/data.db`, config at `~/.openvolo/config.json` (AES-256 encrypted credentials).
 
@@ -75,7 +75,7 @@ platform: row.platform as Contact["platform"]                       // breaks
 
 **`attachIdentities` pattern** — Batch-fetch identities with `inArray()` to avoid N+1 queries on list views.
 
-**shadcn/ui installs** — Requires `.npmrc` with `legacy-peer-deps=true` due to zod v3/v4 peer conflicts between ai-sdk and claude-agent-sdk.
+**shadcn/ui installs** — Requires `.npmrc` with `legacy-peer-deps=true` due to zod v3/v4 peer conflicts.
 
 ## Environment
 

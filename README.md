@@ -25,7 +25,7 @@
 &nbsp;&bull;&nbsp;
 **Multi-platform** — X + LinkedIn + Gmail in one CRM
 &nbsp;&bull;&nbsp;
-**AI-powered** — Claude Agent SDK + Vercel AI SDK
+**AI-powered** — Claude AI via Vercel AI SDK
 
 ---
 
@@ -62,7 +62,7 @@ Dual search providers: Brave for broad discovery, Tavily for deep research. Inte
 Five-tab dashboard — Overview, Agents, Engagement, Content, Sync Health. Six reusable chart components (area, bar, donut, ranked table, stat cards, skeleton). Time range filtering across all tabs.
 
 ### AI Chat Assistant
-Streaming chat panel (Cmd+K) powered by Vercel AI SDK 6. Eight CRM tools for querying contacts, analytics, workflows, and content — plus creating contacts, tasks, and starting workflows — all conversationally. Page-aware context injection adapts responses to your current view.
+Streaming chat panel (Cmd+K) powered by Vercel AI SDK 6. Eight CRM tools for querying contacts, analytics, workflows, and content — plus creating contacts, tasks, and starting workflows — all conversationally. Page-aware context injection adapts responses to your current view. Smart prompts suggest relevant queries based on your current page. Save conversations and continue them later from the searchable history panel.
 
 ### Browser Enrichment
 Playwright-based profile scraping with anti-detection measures, LLM-powered field extraction, and session persistence for authenticated scraping.
@@ -119,7 +119,7 @@ TAVILY_API_KEY=
 
 **Rendering boundary** — Server Components read the database directly (better-sqlite3 is synchronous). Client Components call API routes via `fetch`.
 
-**Two-tier AI** — Vercel AI SDK 6 handles streaming chat in the UI. Claude Agent SDK runs background agents for automation tasks.
+**AI** — Vercel AI SDK 6 powers both streaming chat in the UI and background agent workflows using Claude models.
 
 **Data layer** — SQLite database at `~/.openvolo/data.db` managed by Drizzle ORM. Credentials are AES-256 encrypted in `~/.openvolo/config.json`.
 
@@ -129,7 +129,7 @@ TAVILY_API_KEY=
 |----------|---------|
 | Framework | Next.js 16.1, React 19, TypeScript 5.8 |
 | Database | SQLite (better-sqlite3), Drizzle ORM 0.45 |
-| AI | Vercel AI SDK 6, Anthropic SDK, Claude Agent SDK |
+| AI | Vercel AI SDK 6, Anthropic SDK |
 | UI | Tailwind CSS 4, shadcn/ui (Radix), Lucide Icons |
 | Charts | Recharts (via shadcn/ui chart component) |
 | Browser | Playwright (enrichment scraping) |
@@ -149,7 +149,7 @@ src/
       content/                        #   Content CRUD
       platforms/                      #   X, LinkedIn, Gmail auth + sync
       tasks/                          #   Task CRUD
-      chat/                           #   AI chat streaming endpoint
+      chat/                           #   AI chat streaming + conversation persistence
       analytics/                      #   Analytics endpoints (5 tabs)
       workflows/                      #   Workflow CRUD + templates + agent runs
     dashboard/                        # UI routes
@@ -170,13 +170,13 @@ src/
       gmail/                          # Gmail/Google client, mappers, adapter
     workflows/                        # Workflow types, sync wrapper
     agents/                           # Agent tools, runner, routing engine
-    chat/                             # Chat types, system prompt, 8 CRM tools
+    chat/                             # Chat types, system prompt, 8 CRM tools, smart prompts
     browser/                          # Browser enrichment (Playwright, anti-detection)
     analytics/                        # Analytics utilities (time range, formatting)
     auth/                             # AES-256 crypto + API key management
   components/                         # Shared UI components (shadcn/ui based)
     charts/                           #   Reusable chart components (area, bar, donut, ...)
-    chat/                             #   Chat panel, message, input, tool results
+    chat/                             #   Chat panel, message, input, toolbar, history
 ```
 
 ## Development
@@ -199,7 +199,7 @@ npm run lint             # ESLint
 - [x] **Phase 2** — Content Library, LinkedIn + Gmail Integration, Browser Enrichment
 - [x] **Phase 3** — Unified Workflows, Agent Runner, Smart Search Routing
 - [x] **Phase 4** — Analytics Dashboard (5-tab with charts)
-- [x] **Phase 5** — AI Chat Assistant (8 CRM tools, streaming)
+- [x] **Phase 5** — AI Chat Assistant (8 CRM tools, streaming, smart prompts, conversation history)
 - [ ] **Phase 6** — Multi-user support, Substack integration, advanced agents
 
 ## License
