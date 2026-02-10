@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { formatWorkflowError } from "@/lib/workflows/format-error";
 import { WorkflowDetailSteps } from "./workflow-detail-steps";
+import { PruneResults } from "./prune-results";
 import { useWorkflowPolling } from "@/hooks/use-workflow-polling";
 import type { WorkflowRunWithSteps } from "@/lib/db/types";
 
@@ -159,6 +160,11 @@ export function WorkflowRunLive({ initialRun }: { initialRun: WorkflowRunWithSte
           </span>
         </div>
       </Card>
+
+      {/* Prune results (when applicable) */}
+      {run.workflowType === "prune" && !isPolling && run.result && (
+        <PruneResults runId={run.id} resultJson={typeof run.result === "string" ? run.result : "{}"} />
+      )}
 
       {/* Step section with Timeline/Graph toggle */}
       <WorkflowDetailSteps steps={steps} animate={isPolling} />

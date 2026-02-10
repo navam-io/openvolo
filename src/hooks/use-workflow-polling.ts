@@ -24,6 +24,7 @@ export interface ProgressData {
     completedAt: number | null;
     config: string | null;
     errors: string | null;
+    result: string | null;
   };
   steps: WorkflowStep[];
   isComplete: boolean;

@@ -14,8 +14,10 @@ import {
   DollarSign,
   Clock,
   Hash,
+  CalendarClock,
 } from "lucide-react";
 import { ActivateDialog } from "./activate-dialog";
+import { ScheduleDialog } from "./schedule-dialog";
 
 interface Template {
   id: string;
@@ -70,6 +72,7 @@ export function TemplateGallery() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTemplate, setActiveTemplate] = useState<Template | null>(null);
+  const [scheduleTemplate, setScheduleTemplate] = useState<Template | null>(null);
   const [filter, setFilter] = useState<string>("all");
 
   useEffect(() => {
@@ -175,14 +178,25 @@ export function TemplateGallery() {
                     </span>
                   )}
                 </div>
-                <Button
-                  size="sm"
-                  className="w-full h-8"
-                  onClick={() => setActiveTemplate(template)}
-                >
-                  <Play className="mr-1.5 h-3 w-3" />
-                  Run
-                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="flex-1 h-8"
+                    onClick={() => setActiveTemplate(template)}
+                  >
+                    <Play className="mr-1.5 h-3 w-3" />
+                    Run
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 px-2"
+                    onClick={() => setScheduleTemplate(template)}
+                    title="Schedule recurring run"
+                  >
+                    <CalendarClock className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           );
@@ -194,6 +208,14 @@ export function TemplateGallery() {
           template={activeTemplate}
           open={!!activeTemplate}
           onClose={() => setActiveTemplate(null)}
+        />
+      )}
+
+      {scheduleTemplate && (
+        <ScheduleDialog
+          template={scheduleTemplate}
+          open={!!scheduleTemplate}
+          onClose={() => setScheduleTemplate(null)}
         />
       )}
     </div>

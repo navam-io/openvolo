@@ -48,7 +48,9 @@ export async function GET(req: NextRequest) {
   const page = parseInt(searchParams.get("page") ?? "1", 10) || 1;
   const pageSize = parseInt(searchParams.get("pageSize") ?? "25", 10) || 25;
 
-  const result = listContacts({ search, funnelStage, platform, page, pageSize });
+  const includeArchived = searchParams.get("includeArchived") === "true";
+
+  const result = listContacts({ search, funnelStage, platform, page, pageSize, includeArchived });
   return NextResponse.json({ data: result.data, total: result.total });
 }
 

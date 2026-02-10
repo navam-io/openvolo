@@ -15,6 +15,7 @@ import {
   engagementMetrics,
   workflowRuns,
   workflowSteps,
+  scheduledJobs,
 } from "./schema";
 
 // Contact types
@@ -76,6 +77,10 @@ export type NewWorkflowRun = InferInsertModel<typeof workflowRuns>;
 export type WorkflowStep = InferSelectModel<typeof workflowSteps>;
 export type NewWorkflowStep = InferInsertModel<typeof workflowSteps>;
 export type WorkflowRunWithSteps = WorkflowRun & { steps: WorkflowStep[] };
+
+// Scheduled job types
+export type ScheduledJob = InferSelectModel<typeof scheduledJobs>;
+export type NewScheduledJob = InferInsertModel<typeof scheduledJobs>;
 
 export interface PaginatedResult<T> {
   data: T[];

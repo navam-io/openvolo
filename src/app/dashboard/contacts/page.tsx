@@ -5,16 +5,18 @@ import { ContactListClient } from "./contact-list-client";
 export default async function ContactsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string; funnelStage?: string; platform?: string; page?: string }>;
+  searchParams: Promise<{ search?: string; funnelStage?: string; platform?: string; page?: string; archived?: string }>;
 }) {
   const params = await searchParams;
   const { page, pageSize } = parsePaginationParams(params);
+  const includeArchived = params.archived === "true";
   const { data, total } = listContacts({
     search: params.search,
     funnelStage: params.funnelStage,
     platform: params.platform,
     page,
     pageSize,
+    includeArchived,
   });
 
   return (
@@ -32,6 +34,7 @@ export default async function ContactsPage({
         pageSize={pageSize}
         currentSearch={params.search}
         currentFunnelStage={params.funnelStage}
+        includeArchived={includeArchived}
       />
     </div>
   );

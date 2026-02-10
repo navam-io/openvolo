@@ -24,7 +24,7 @@ import { PriorityBadge } from "@/components/priority-badge";
 import { EnrichmentScoreBadge } from "@/components/enrichment-score-badge";
 import { IdentitiesSection } from "@/components/identities-section";
 import { EnrichButton } from "@/components/enrich-button";
-import { ArrowLeft, Trash2, Save, CheckCircle2, Circle } from "lucide-react";
+import { ArrowLeft, Trash2, Save, CheckCircle2, Circle, Archive, RotateCcw } from "lucide-react";
 import Link from "next/link";
 import type { ContactWithIdentities, Task } from "@/lib/db/types";
 
@@ -104,8 +104,55 @@ export function ContactDetailClient({ contact, tasks }: ContactDetailClientProps
     try { tags = JSON.parse(contact.tags); } catch { /* malformed JSON, ignore */ }
   }
 
+  // Parse archived state from metadata
+  const [restoring, setRestoring] = useState(false);
+  let contactArchived = false;
+  let archiveReason = "";
+  let archivedAt: number | null = null;
+  try {
+    const meta = JSON.parse(contact.metadata ?? "{}");
+    contactArchived = meta.archived === 1;
+    archiveReason = meta.archiveReason ?? "";
+    archivedAt = meta.archivedAt ?? null;
+  } catch { /* ignore */ }
+
+  async function handleRestore() {
+    setRestoring(true);
+    const res = await fetch(`/api/contacts/${contact.id}/restore`, { method: "POST" });
+    if (res.ok) {
+      router.refresh();
+    }
+    setRestoring(false);
+  }
+
   return (
     <div className="space-y-6">
+      {/* Archived banner */}
+      {contactArchived && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="flex items-center justify-between py-3">
+            <div className="flex items-center gap-3">
+              <Archive className="h-4 w-4 text-destructive" />
+              <div>
+                <p className="text-sm font-medium">This contact is archived</p>
+                {archiveReason && (
+                  <p className="text-xs text-muted-foreground">{archiveReason}</p>
+                )}
+                {archivedAt && (
+                  <p className="text-xs text-muted-foreground">
+                    Archived {new Date(archivedAt * 1000).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleRestore} disabled={restoring}>
+              <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+              Restore
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Link href="/dashboard/contacts">

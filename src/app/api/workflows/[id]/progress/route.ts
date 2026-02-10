@@ -37,6 +37,7 @@ export async function GET(
       completedAt: run.completedAt,
       config: run.config,
       errors: run.errors,
+      result: run.result,
     },
     steps: run.steps,
     isComplete,

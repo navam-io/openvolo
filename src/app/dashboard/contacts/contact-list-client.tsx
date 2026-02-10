@@ -25,7 +25,8 @@ import { AddContactDialog } from "@/components/add-contact-dialog";
 import { FunnelStageBadge } from "@/components/funnel-stage-badge";
 import { EnrichmentScoreBadge } from "@/components/enrichment-score-badge";
 import { PaginationControls } from "@/components/pagination-controls";
-import { Users } from "lucide-react";
+import { Users, Archive } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { ContactWithIdentities } from "@/lib/db/types";
 
 const funnelStages = ["all", "prospect", "engaged", "qualified", "opportunity", "customer", "advocate"];
@@ -36,6 +37,16 @@ const platformLabels: Record<string, string> = {
   substack: "SS",
 };
 
+/** Check if a contact is archived by parsing its metadata JSON. */
+function isArchived(contact: ContactWithIdentities): boolean {
+  try {
+    const meta = JSON.parse(contact.metadata ?? "{}");
+    return meta.archived === 1;
+  } catch {
+    return false;
+  }
+}
+
 interface ContactListClientProps {
   contacts: ContactWithIdentities[];
   total: number;
@@ -43,6 +54,7 @@ interface ContactListClientProps {
   pageSize: number;
   currentSearch?: string;
   currentFunnelStage?: string;
+  includeArchived?: boolean;
 }
 
 export function ContactListClient({
@@ -52,6 +64,7 @@ export function ContactListClient({
   pageSize,
   currentSearch,
   currentFunnelStage,
+  includeArchived,
 }: ContactListClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -134,6 +147,15 @@ export function ContactListClient({
             ))}
           </SelectContent>
         </Select>
+        <Button
+          variant={includeArchived ? "secondary" : "outline"}
+          size="sm"
+          onClick={() => updateParams("archived", includeArchived ? "" : "true")}
+          className="gap-1.5"
+        >
+          <Archive className="h-3.5 w-3.5" />
+          {includeArchived ? "Hide Archived" : "Show Archived"}
+        </Button>
         <AddContactDialog />
       </div>
 
@@ -158,15 +180,25 @@ export function ContactListClient({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {contacts.map((contact) => (
-                <TableRow key={contact.id} className="hover:bg-accent/30 transition-colors">
+              {contacts.map((contact) => {
+                const archived = isArchived(contact);
+                return (
+                <TableRow key={contact.id} className={`hover:bg-accent/30 transition-colors ${archived ? "opacity-60" : ""}`}>
                   <TableCell>
-                    <Link
-                      href={`/dashboard/contacts/${contact.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {contact.name}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/dashboard/contacts/${contact.id}`}
+                        className="font-medium hover:underline"
+                      >
+                        {contact.name}
+                      </Link>
+                      {archived && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 gap-1">
+                          <Archive className="h-2.5 w-2.5" />
+                          Archived
+                        </Badge>
+                      )}
+                    </div>
                     {contact.headline && (
                       <p className="text-xs text-muted-foreground truncate max-w-[200px]">
                         {contact.headline}
@@ -196,7 +228,8 @@ export function ContactListClient({
                     <EnrichmentScoreBadge score={contact.enrichmentScore} />
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </div>

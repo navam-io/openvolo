@@ -2,6 +2,7 @@ import { listWorkflowRuns } from "@/lib/db/queries/workflows";
 import { WorkflowQuickActions } from "./workflow-quick-actions";
 import { WorkflowViewSwitcher } from "./workflow-view-switcher";
 import { TemplateGallery } from "./template-gallery";
+import { ScheduledJobsList } from "./scheduled-jobs-list";
 import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/empty-state";
 import { GitBranch } from "lucide-react";
@@ -23,6 +24,9 @@ export default function WorkflowsPage() {
 
       {/* Template gallery at the top */}
       <TemplateGallery />
+
+      {/* Scheduled jobs */}
+      <ScheduledJobsList />
 
       {/* Workflow runs below */}
       {result.total === 0 ? (

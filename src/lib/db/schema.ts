@@ -441,6 +441,11 @@ export const scheduledJobs = sqliteTable("scheduled_jobs", {
   retryCount: integer("retry_count").notNull().default(0),
   maxRetries: integer("max_retries").notNull().default(3),
   error: text("error"),
+  // Scheduling columns
+  templateId: text("template_id").references(() => workflowTemplates.id),
+  cronExpression: text("cron_expression"),
+  enabled: integer("enabled").notNull().default(1),
+  lastTriggeredAt: integer("last_triggered_at"),
   createdAt: integer("created_at")
     .notNull()
     .default(sql`(unixepoch())`),

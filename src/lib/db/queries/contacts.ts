@@ -57,8 +57,14 @@ export function listContacts(opts?: {
   platform?: string;
   page?: number;
   pageSize?: number;
+  includeArchived?: boolean;
 }): PaginatedResult<ContactWithIdentities> {
   const conditions: SQL[] = [];
+
+  // Exclude archived contacts by default
+  if (!opts?.includeArchived) {
+    conditions.push(sql`json_extract(${contacts.metadata}, '$.archived') IS NOT 1`);
+  }
 
   if (opts?.search) {
     const pattern = `%${opts.search}%`;
@@ -204,6 +210,68 @@ export function deleteContact(id: string): boolean {
 
 export function countContacts(): number {
   const result = db.select({ value: count() }).from(contacts).get();
+  return result?.value ?? 0;
+}
+
+/** Archive a contact with a reason, optionally linking to the workflow run that triggered it. */
+export function archiveContact(
+  id: string,
+  reason: string,
+  workflowRunId?: string
+): ContactWithIdentities | undefined {
+  const contact = getContactById(id);
+  if (!contact) return undefined;
+
+  const existing: Record<string, unknown> = JSON.parse(contact.metadata ?? "{}");
+  const metadata = JSON.stringify({
+    ...existing,
+    archived: 1,
+    archivedAt: Math.floor(Date.now() / 1000),
+    archiveReason: reason,
+    ...(workflowRunId ? { archiveWorkflowRunId: workflowRunId } : {}),
+  });
+
+  return updateContact(id, { metadata });
+}
+
+/** Restore a previously archived contact by clearing archive keys from metadata. */
+export function restoreContact(id: string): ContactWithIdentities | undefined {
+  const contact = getContactById(id);
+  if (!contact) return undefined;
+
+  const existing: Record<string, unknown> = JSON.parse(contact.metadata ?? "{}");
+  delete existing.archived;
+  delete existing.archivedAt;
+  delete existing.archiveReason;
+  delete existing.archiveWorkflowRunId;
+  const metadata = JSON.stringify(existing);
+
+  return updateContact(id, { metadata });
+}
+
+/** Restore all contacts archived by a specific workflow run. Returns count restored. */
+export function restoreContactsByWorkflowRun(workflowRunId: string): number {
+  const rows = db
+    .select()
+    .from(contacts)
+    .where(sql`json_extract(${contacts.metadata}, '$.archiveWorkflowRunId') = ${workflowRunId}`)
+    .all();
+
+  let count = 0;
+  for (const row of rows) {
+    restoreContact(row.id);
+    count++;
+  }
+  return count;
+}
+
+/** Count archived contacts. */
+export function countArchivedContacts(): number {
+  const result = db
+    .select({ value: count() })
+    .from(contacts)
+    .where(sql`json_extract(${contacts.metadata}, '$.archived') = 1`)
+    .get();
   return result?.value ?? 0;
 }
 

@@ -1,0 +1,95 @@
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { CronExpressionParser } from "cron-parser";
+import {
+  getScheduledJob,
+  updateScheduledJob,
+  deleteScheduledJob,
+} from "@/lib/db/queries/scheduled-jobs";
+
+const updateScheduleSchema = z.object({
+  cronExpression: z.string().optional(),
+  payload: z.record(z.unknown()).optional(),
+  enabled: z.boolean().optional(),
+});
+
+/**
+ * GET /api/workflows/schedule/[id]
+ */
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const job = getScheduledJob(id);
+
+  if (!job) {
+    return NextResponse.json({ error: "Schedule not found" }, { status: 404 });
+  }
+
+  return NextResponse.json(job);
+}
+
+/**
+ * PUT /api/workflows/schedule/[id]
+ */
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
+  try {
+    const body = await req.json();
+    const data = updateScheduleSchema.parse(body);
+
+    // Validate cron expression if provided
+    if (data.cronExpression) {
+      try {
+        CronExpressionParser.parse(data.cronExpression);
+      } catch {
+        return NextResponse.json(
+          { error: "Invalid cron expression" },
+          { status: 400 }
+        );
+      }
+    }
+
+    const updates: Record<string, unknown> = {};
+    if (data.cronExpression !== undefined) updates.cronExpression = data.cronExpression;
+    if (data.payload !== undefined) updates.payload = JSON.stringify(data.payload);
+    if (data.enabled !== undefined) updates.enabled = data.enabled ? 1 : 0;
+
+    const job = updateScheduledJob(id, updates);
+    if (!job) {
+      return NextResponse.json({ error: "Schedule not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(job);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: error.errors }, { status: 400 });
+    }
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/workflows/schedule/[id]
+ */
+export async function DELETE(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const deleted = deleteScheduledJob(id);
+
+  if (!deleted) {
+    return NextResponse.json({ error: "Schedule not found" }, { status: 404 });
+  }
+
+  return NextResponse.json({ success: true });
+}

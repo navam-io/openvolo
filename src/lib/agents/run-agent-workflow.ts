@@ -6,6 +6,7 @@ import {
   updateWorkflowRun,
   createWorkflowStep,
   nextStepIndex,
+  listWorkflowSteps,
 } from "@/lib/db/queries/workflows";
 import { getTemplate, updateTemplate } from "@/lib/db/queries/workflow-templates";
 import { listContacts, createContact, findContactByNameOrEmail } from "@/lib/db/queries/contacts";
@@ -13,6 +14,7 @@ import { urlFetch } from "@/lib/agents/tools/url-fetch";
 import { browserScrape } from "@/lib/agents/tools/browser-scrape";
 import { searchWeb } from "@/lib/agents/tools/search-web";
 import { enrichContact } from "@/lib/agents/tools/enrich-contact";
+import { archiveContactTool } from "@/lib/agents/tools/archive-contact";
 import { updateProgress } from "@/lib/agents/tools/update-progress";
 import { routeUrl, shouldEscalateToBrowser } from "@/lib/agents/router";
 import type { AgentRunConfig } from "@/lib/agents/types";
@@ -56,6 +58,7 @@ function buildSystemPrompt(
 - **scrape_url**: Use a headless browser to scrape JS-rendered pages
 - **create_contact**: Create a new contact in the CRM (use for each person you discover)
 - **enrich_contact**: Update an existing contact with new data (fill gaps only)
+- **archive_contact**: Archive a contact with a reason (used during prune workflows)
 - **report_progress**: Report progress during execution
 
 ## Guidelines
@@ -74,7 +77,7 @@ function getDefaultPrompt(workflowType: WorkflowType): string {
     case "enrich":
       return "You are an AI enrichment agent. Your goal is to fill in missing information for existing contacts. Look up their profiles online, find their company, title, bio, and other details, then update the contact records.";
     case "prune":
-      return "You are an AI data quality agent. Your goal is to identify contacts that should be archived or removed based on specific criteria (inactive, duplicate, invalid). Review contacts and report which ones should be pruned and why.";
+      return "You are an AI data quality agent. Your goal is to identify contacts that should be archived based on specific criteria (inactive, duplicate, invalid). Review each contact, determine if they meet the pruning criteria, and use `archive_contact` to archive those that do. Provide a clear reason for each archive action.";
     case "agent":
       return "You are a general-purpose AI agent. Follow the instructions provided to complete your task using the available tools.";
     default:
@@ -305,6 +308,18 @@ export async function runAgentWorkflow(
           },
         }),
 
+        archive_contact: tool({
+          description:
+            "Archive a contact with a reason. Use this during prune workflows to mark contacts for removal from the active list.",
+          inputSchema: z.object({
+            contactId: z.string().describe("The contact ID to archive"),
+            reason: z.string().describe("Why this contact is being archived"),
+          }),
+          execute: async ({ contactId, reason }) => {
+            return archiveContactTool(contactId, reason, runId);
+          },
+        }),
+
         create_contact: tool({
           description:
             "Create a new contact record in the CRM. Use this for each person you discover during search workflows. At minimum a name is required.",
@@ -448,6 +463,17 @@ export async function runAgentWorkflow(
     const outputTokens = result.usage?.outputTokens ?? 0;
     const costUsd = calculateCost(modelId, inputTokens, outputTokens);
 
+    // Build result summary
+    const resultData: Record<string, unknown> = {
+      finalText: result.text?.slice(0, 2000) ?? "",
+      stepsCount: result.steps.length,
+    };
+
+    // Add prune-specific result summary
+    if (config.workflowType === "prune") {
+      resultData.pruneResult = buildPruneResult(runId);
+    }
+
     // Update the run with final results
     const finalRun = updateWorkflowRun(runId, {
       status: "completed",
@@ -456,10 +482,7 @@ export async function runAgentWorkflow(
       inputTokens,
       outputTokens,
       costUsd,
-      result: JSON.stringify({
-        finalText: result.text?.slice(0, 2000) ?? "",
-        stepsCount: result.steps.length,
-      }),
+      result: JSON.stringify(resultData),
     });
 
     // Update template stats if applicable
@@ -632,6 +655,18 @@ async function executeAgentLoop(
           },
         }),
 
+        archive_contact: tool({
+          description:
+            "Archive a contact with a reason. Use this during prune workflows to mark contacts for removal.",
+          inputSchema: z.object({
+            contactId: z.string().describe("The contact ID to archive"),
+            reason: z.string().describe("Why this contact is being archived"),
+          }),
+          execute: async ({ contactId, reason }) => {
+            return archiveContactTool(contactId, reason, runId);
+          },
+        }),
+
         create_contact: tool({
           description:
             "Create a new contact record in the CRM. Use this for each person you discover during search workflows.",
@@ -748,6 +783,16 @@ async function executeAgentLoop(
     const outputTokens = result.usage?.outputTokens ?? 0;
     const costUsd = calculateCost(modelId, inputTokens, outputTokens);
 
+    // Build result summary
+    const resultData: Record<string, unknown> = {
+      finalText: result.text?.slice(0, 2000) ?? "",
+      stepsCount: result.steps.length,
+    };
+
+    if (config.workflowType === "prune") {
+      resultData.pruneResult = buildPruneResult(runId);
+    }
+
     updateWorkflowRun(runId, {
       status: "completed",
       completedAt: Math.floor(Date.now() / 1000),
@@ -755,10 +800,7 @@ async function executeAgentLoop(
       inputTokens,
       outputTokens,
       costUsd,
-      result: JSON.stringify({
-        finalText: result.text?.slice(0, 2000) ?? "",
-        stepsCount: result.steps.length,
-      }),
+      result: JSON.stringify(resultData),
     });
 
     if (config.templateId && template) {
@@ -787,4 +829,36 @@ async function executeAgentLoop(
       errorItems: 1,
     });
   }
+}
+
+/**
+ * Build a prune result summary from the workflow steps.
+ * Counts archived contacts and extracts their details.
+ */
+function buildPruneResult(runId: string) {
+  const steps = listWorkflowSteps(runId);
+  const archiveSteps = steps.filter(
+    (s) => s.stepType === "contact_archive" && s.status === "completed"
+  );
+
+  const archivedContacts = archiveSteps.map((s) => {
+    const output = JSON.parse(s.output ?? "{}");
+    return {
+      contactId: output.contactId ?? s.contactId,
+      contactName: output.contactName ?? "Unknown",
+      reason: output.reason ?? "",
+    };
+  });
+
+  // Count total contacts evaluated (all contacts passed to the agent)
+  const evaluateSteps = steps.filter(
+    (s) => s.stepType === "contact_archive"
+  );
+
+  return {
+    evaluated: evaluateSteps.length,
+    archived: archivedContacts.length,
+    kept: evaluateSteps.length - archivedContacts.length,
+    archivedContacts,
+  };
 }

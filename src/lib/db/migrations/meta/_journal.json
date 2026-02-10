@@ -15,6 +15,13 @@
       "when": 1770652904531,
       "tag": "0001_nice_epoch",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1770691917869,
+      "tag": "0002_sharp_jackpot",
+      "breakpoints": true
     }
   ]
 }
