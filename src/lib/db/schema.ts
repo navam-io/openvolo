@@ -111,6 +111,9 @@ export const workflowTemplates = sqliteTable("workflow_templates", {
   estimatedCost: real("estimated_cost").notNull().default(0), // Estimated cost per run in USD
   totalRuns: integer("total_runs").notNull().default(0), // Lifetime run count
   lastRunAt: integer("last_run_at"), // Timestamp of most recent run
+  // User template columns
+  isSystem: integer("is_system").notNull().default(0), // 1 = system-seeded, 0 = user
+  sourceTemplateId: text("source_template_id"), // FK to workflowTemplates.id (self-ref, managed via migration SQL)
   ...timestamps,
 });
 
@@ -372,6 +375,8 @@ export const workflowSteps = sqliteTable("workflow_steps", {
       "routing_decision", "sync_page", "error",
       // Agent step types (merged from agent_steps)
       "thinking", "tool_call", "tool_result", "decision", "engagement_action",
+      // Phase 6 step types
+      "content_publish", "post_engagement",
     ],
   }).notNull(),
   status: text("status", {

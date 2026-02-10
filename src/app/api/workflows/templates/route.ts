@@ -14,6 +14,10 @@ const createTemplateSchema = z.object({
   goalMetrics: z.string().optional(),
   startsAt: z.number().int().optional(),
   endsAt: z.number().int().optional(),
+  systemPrompt: z.string().optional(),
+  targetPersona: z.string().optional(),
+  estimatedCost: z.number().optional(),
+  sourceTemplateId: z.string().optional(),
 });
 
 /**
@@ -28,12 +32,14 @@ export async function GET(req: NextRequest) {
   const templateType = url.searchParams.get("templateType") as
     | "outreach" | "engagement" | "content" | "nurture" | "prospecting" | "enrichment" | "pruning"
     | null;
+  const isSystemParam = url.searchParams.get("isSystem");
   const page = parseInt(url.searchParams.get("page") ?? "1", 10);
   const pageSize = parseInt(url.searchParams.get("pageSize") ?? "25", 10);
 
   const result = listTemplates({
     status: status ?? undefined,
     templateType: templateType ?? undefined,
+    isSystem: isSystemParam !== null ? isSystemParam === "true" : undefined,
     page,
     pageSize,
   });
@@ -43,13 +49,16 @@ export async function GET(req: NextRequest) {
 
 /**
  * POST /api/workflows/templates
- * Create a new workflow template.
+ * Create a new workflow template (always user-created, isSystem=0).
  */
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const data = createTemplateSchema.parse(body);
-    const template = createTemplate(data);
+    const template = createTemplate({
+      ...data,
+      isSystem: 0,
+    });
     return NextResponse.json(template, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {

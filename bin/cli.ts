@@ -83,6 +83,17 @@ async function startApp(port: number) {
       // Migration module may not be available in all contexts
     }
 
+    // Run template user columns migration (idempotent)
+    try {
+      const { migrateTemplateUserColumns } = await import("../src/lib/db/migrations/add-template-user-columns");
+      const migResult = migrateTemplateUserColumns();
+      if (migResult.migrated) {
+        console.log("  Migrated template user columns ✓");
+      }
+    } catch {
+      // Migration module may not be available in all contexts
+    }
+
     // Seed workflow templates (idempotent)
     try {
       const { seedTemplates } = await import("../src/lib/db/seed-templates");

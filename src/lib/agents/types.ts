@@ -59,6 +59,15 @@ export interface EnrichContactResult {
   newScore: number;
 }
 
+/** Result of engaging with a post via browser automation. */
+export interface EngagePostResult {
+  success: boolean;
+  action: "like" | "reply" | "retweet";
+  platform: "x" | "linkedin";
+  postUrl: string;
+  error?: string;
+}
+
 /** Routing strategy for a URL. */
 export type FetchStrategy = "url_fetch" | "browser_scrape";
 

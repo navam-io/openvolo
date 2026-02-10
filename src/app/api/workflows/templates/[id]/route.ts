@@ -18,6 +18,9 @@ const updateTemplateSchema = z.object({
   goalMetrics: z.string().optional(),
   startsAt: z.number().int().nullable().optional(),
   endsAt: z.number().int().nullable().optional(),
+  systemPrompt: z.string().nullable().optional(),
+  targetPersona: z.string().nullable().optional(),
+  estimatedCost: z.number().optional(),
 });
 
 /**
@@ -61,15 +64,26 @@ export async function PATCH(
 
 /**
  * DELETE /api/workflows/templates/[id]
+ * Rejects deletion of system templates (403).
  */
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  const template = getTemplate(id);
+  if (!template) {
+    return NextResponse.json({ error: "Template not found" }, { status: 404 });
+  }
+  if (template.isSystem === 1) {
+    return NextResponse.json(
+      { error: "Cannot delete system templates" },
+      { status: 403 }
+    );
+  }
   const deleted = deleteTemplate(id);
   if (!deleted) {
-    return NextResponse.json({ error: "Template not found" }, { status: 404 });
+    return NextResponse.json({ error: "Failed to delete template" }, { status: 500 });
   }
   return new NextResponse(null, { status: 204 });
 }

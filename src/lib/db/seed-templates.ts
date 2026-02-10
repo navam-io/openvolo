@@ -1,13 +1,17 @@
-import { createTemplate, listTemplates } from "@/lib/db/queries/workflow-templates";
+import { eq, and } from "drizzle-orm";
+import { db } from "@/lib/db/client";
+import { workflowTemplates } from "@/lib/db/schema";
+import { createTemplate } from "@/lib/db/queries/workflow-templates";
 
 interface TemplateSeed {
   name: string;
   description: string;
-  templateType: "prospecting" | "enrichment" | "pruning";
+  templateType: "prospecting" | "enrichment" | "pruning" | "content" | "engagement" | "outreach" | "nurture";
   systemPrompt: string;
   targetPersona: string;
   estimatedCost: number;
   config: Record<string, unknown>;
+  platform?: "x" | "linkedin";
 }
 
 const SEED_TEMPLATES: TemplateSeed[] = [
@@ -190,32 +194,133 @@ those that should be removed from the active list.
 - People who left the company may still be valuable contacts — keep them if they're useful`,
     config: { companyName: "", maxContacts: 50 },
   },
+  // --- Phase 6E: New seed templates ---
+  {
+    name: "Thought Leadership Posts",
+    description: "Generate and publish thought leadership content on X and LinkedIn. Creates posts aligned with your brand voice and industry expertise.",
+    templateType: "content",
+    platform: "x",
+    targetPersona: "Your professional audience interested in industry insights and thought leadership",
+    estimatedCost: 0.20,
+    systemPrompt: `You are a content creation agent for thought leadership.
+
+## Objective
+Research trending topics in the user's industry and create compelling social media posts.
+Use \`search_web\` to find current trends, news, and discussion topics, then craft
+posts that demonstrate expertise and drive engagement.
+
+## Process
+1. Search for trending topics and recent news in the target industry
+2. Identify 3-5 angles for thought leadership content
+3. Draft posts that are insightful, concise, and engaging
+4. Use \`report_progress\` to share drafted content for review
+
+## Rules
+- Keep posts concise: X posts under 280 chars, LinkedIn posts under 1300 chars
+- Include a clear point of view — avoid generic statements
+- Add relevant hashtags (2-3 max)
+- Vary post formats: questions, hot takes, data points, stories
+- Never fabricate statistics or quotes`,
+    config: { topics: [], tone: "professional", frequency: "daily" },
+  },
+  {
+    name: "Reply to Mentions",
+    description: "Monitor and engage with mentions, replies, and tags on X. Uses browser automation to like and reply to relevant interactions.",
+    templateType: "engagement",
+    platform: "x",
+    targetPersona: "People who mention, reply to, or tag you on X",
+    estimatedCost: 0.15,
+    systemPrompt: `You are an engagement agent responding to social mentions.
+
+## Objective
+Find recent mentions and replies on X, then engage with them appropriately.
+Use \`search_web\` to find mentions, \`fetch_url\` to read post context, and
+\`engage_post\` to like or reply to posts.
+
+## Process
+1. Search for recent mentions of the user's handle or brand
+2. For each mention, assess if it's positive, neutral, or negative
+3. Like positive mentions using \`engage_post\` with action "like"
+4. Reply to thoughtful mentions using \`engage_post\` with action "reply"
+5. Skip spam, irrelevant, or negative mentions
+6. Report progress after each batch
+
+## Rules
+- Always like before replying — it's a goodwill signal
+- Keep replies authentic and conversational
+- Don't engage with trolls or spam
+- Limit to 10 engagements per run to stay within rate limits
+- Report progress after every 3-4 engagements`,
+    config: { maxReplies: 10, platforms: ["x"] },
+  },
+  {
+    name: "Cold Intro via Comments",
+    description: "Build relationships by engaging with target contacts' posts. Likes and leaves thoughtful comments to establish familiarity before direct outreach.",
+    templateType: "outreach",
+    platform: "x",
+    targetPersona: "Prospects and target contacts whose posts you want to engage with",
+    estimatedCost: 0.20,
+    systemPrompt: `You are an outreach agent building relationships through engagement.
+
+## Objective
+Warm up relationships with target contacts by engaging with their recent posts.
+Search for their content, then like and comment with thoughtful, relevant responses.
+
+## Process
+1. For each target contact, search for their recent posts on X
+2. Read the posts to understand the context and topic
+3. Like each post using \`engage_post\` with action "like"
+4. Reply to the most relevant post with an insightful comment using \`engage_post\` with action "reply"
+5. Move to the next contact
+6. Report progress after each contact
+
+## Rules
+- Add genuine value in every comment — no generic "Great post!" responses
+- Reference specific points from their post to show you actually read it
+- Keep comments brief (1-3 sentences) but substantive
+- Don't mention your product/service — this is relationship building, not selling
+- Limit to 5 contacts per run to avoid looking like a bot
+- Report progress after engaging with each contact`,
+    config: { maxEngagements: 5, platforms: ["x"] },
+  },
 ];
 
 /**
  * Seed the database with pre-defined workflow templates.
- * Idempotent — skips if templates already exist.
+ * Idempotent — skips individual templates that already exist as system templates.
  */
 export function seedTemplates(): { seeded: number; skipped: boolean } {
-  const existing = listTemplates({ pageSize: 1 });
-  if (existing.total > 0) {
-    return { seeded: 0, skipped: true };
-  }
-
   let seeded = 0;
+
   for (const seed of SEED_TEMPLATES) {
+    // Check if a system template with this exact name already exists
+    const existing = db
+      .select()
+      .from(workflowTemplates)
+      .where(
+        and(
+          eq(workflowTemplates.name, seed.name),
+          eq(workflowTemplates.isSystem, 1)
+        )
+      )
+      .get();
+
+    if (existing) continue;
+
     createTemplate({
       name: seed.name,
       description: seed.description,
       templateType: seed.templateType,
+      platform: seed.platform ?? null,
       status: "active",
       systemPrompt: seed.systemPrompt,
       targetPersona: seed.targetPersona,
       estimatedCost: seed.estimatedCost,
       config: JSON.stringify(seed.config),
+      isSystem: 1,
     });
     seeded++;
   }
 
-  return { seeded, skipped: false };
+  return { seeded, skipped: seeded === 0 };
 }

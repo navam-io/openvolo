@@ -15,6 +15,7 @@ import { browserScrape } from "@/lib/agents/tools/browser-scrape";
 import { searchWeb } from "@/lib/agents/tools/search-web";
 import { enrichContact } from "@/lib/agents/tools/enrich-contact";
 import { archiveContactTool } from "@/lib/agents/tools/archive-contact";
+import { engagePost } from "@/lib/agents/tools/engage-post";
 import { updateProgress } from "@/lib/agents/tools/update-progress";
 import { routeUrl, shouldEscalateToBrowser } from "@/lib/agents/router";
 import type { AgentRunConfig } from "@/lib/agents/types";
@@ -59,6 +60,7 @@ function buildSystemPrompt(
 - **create_contact**: Create a new contact in the CRM (use for each person you discover)
 - **enrich_contact**: Update an existing contact with new data (fill gaps only)
 - **archive_contact**: Archive a contact with a reason (used during prune workflows)
+- **engage_post**: Engage with a post on X or LinkedIn (like, reply, or retweet) via browser automation
 - **report_progress**: Report progress during execution
 
 ## Guidelines
@@ -407,6 +409,20 @@ export async function runAgentWorkflow(
           },
         }),
 
+        engage_post: tool({
+          description:
+            "Engage with a post on X or LinkedIn via browser automation. Supports like, reply, and retweet actions. Requires a browser session to be set up.",
+          inputSchema: z.object({
+            platform: z.enum(["x", "linkedin"]).describe("Social media platform"),
+            postUrl: z.string().describe("Full URL of the post to engage with"),
+            action: z.enum(["like", "reply", "retweet"]).describe("Engagement action"),
+            replyText: z.string().optional().describe("Text for reply action (required if action is reply)"),
+          }),
+          execute: async ({ platform, postUrl, action, replyText }) => {
+            return engagePost(platform, postUrl, action, runId, { replyText });
+          },
+        }),
+
         report_progress: tool({
           description:
             "Report your current progress. Use this after completing major steps to keep the user informed.",
@@ -748,6 +764,20 @@ async function executeAgentLoop(
               enrichmentScore: contact.enrichmentScore,
               message: `Contact "${contact.name}" created successfully.`,
             };
+          },
+        }),
+
+        engage_post: tool({
+          description:
+            "Engage with a post on X or LinkedIn via browser automation (like, reply, retweet).",
+          inputSchema: z.object({
+            platform: z.enum(["x", "linkedin"]).describe("Social media platform"),
+            postUrl: z.string().describe("Full URL of the post"),
+            action: z.enum(["like", "reply", "retweet"]).describe("Engagement action"),
+            replyText: z.string().optional().describe("Text for reply action"),
+          }),
+          execute: async ({ platform, postUrl, action, replyText }) => {
+            return engagePost(platform, postUrl, action, runId, { replyText });
           },
         }),
 

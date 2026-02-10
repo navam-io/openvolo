@@ -18,7 +18,10 @@ export type WorkflowStepType =
   | "tool_call"
   | "tool_result"
   | "decision"
-  | "engagement_action";
+  | "engagement_action"
+  // Phase 6 step types
+  | "content_publish"
+  | "post_engagement";
 
 /** Human-readable labels for workflow types. */
 export const WORKFLOW_TYPE_LABELS: Record<WorkflowType, string> = {

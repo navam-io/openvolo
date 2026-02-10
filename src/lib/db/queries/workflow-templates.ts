@@ -96,6 +96,7 @@ export function getTemplate(
 export function listTemplates(opts?: {
   status?: WorkflowTemplate["status"];
   templateType?: WorkflowTemplate["templateType"];
+  isSystem?: boolean;
   page?: number;
   pageSize?: number;
 }): PaginatedResult<WorkflowTemplate> {
@@ -116,6 +117,9 @@ export function listTemplates(opts?: {
         opts.templateType as "outreach" | "engagement" | "content" | "nurture" | "prospecting" | "enrichment" | "pruning"
       )
     );
+  }
+  if (opts?.isSystem !== undefined) {
+    conditions.push(eq(workflowTemplates.isSystem, opts.isSystem ? 1 : 0));
   }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
@@ -142,6 +146,43 @@ export function listTemplates(opts?: {
   return { data, total };
 }
 
+/**
+ * Clone a template, creating a new user template from a source.
+ */
+export function cloneTemplate(
+  sourceId: string,
+  overrides?: Partial<{
+    name: string;
+    description: string;
+    systemPrompt: string;
+    targetPersona: string;
+    config: string;
+  }>
+): WorkflowTemplate | undefined {
+  const source = db
+    .select()
+    .from(workflowTemplates)
+    .where(eq(workflowTemplates.id, sourceId))
+    .get();
+  if (!source) return undefined;
+
+  return createTemplate({
+    name: overrides?.name ?? `${source.name} (Copy)`,
+    description: overrides?.description ?? source.description,
+    platform: source.platform,
+    templateType: source.templateType,
+    status: "active",
+    config: overrides?.config ?? source.config,
+    goalMetrics: source.goalMetrics,
+    systemPrompt: overrides?.systemPrompt ?? source.systemPrompt,
+    targetPersona: overrides?.targetPersona ?? source.targetPersona,
+    estimatedCost: source.estimatedCost,
+    totalRuns: 0,
+    isSystem: 0,
+    sourceTemplateId: sourceId,
+  });
+}
+
 export function deleteTemplate(id: string): boolean {
   const existing = db
     .select()
@@ -149,6 +190,9 @@ export function deleteTemplate(id: string): boolean {
     .where(eq(workflowTemplates.id, id))
     .get();
   if (!existing) return false;
+
+  // Prevent deletion of system templates
+  if (existing.isSystem === 1) return false;
 
   // Cascade deletes steps + enrollments via FK onDelete
   db.delete(workflowTemplates)
