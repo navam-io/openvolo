@@ -201,10 +201,44 @@ async function startApp(port: number) {
   });
 }
 
+const FEATURES_HELP = `
+Features:
+  Contacts        Multi-platform CRM (X, LinkedIn, Gmail)
+  Content         9 types: post, article, thread, reply,
+                  image, video, email, dm, newsletter
+  Automation      10 seed templates, 6 workflow types
+                  (sync, enrich, search, prune, sequence, agent)
+  AI Agents       8 tools: url-fetch, browser-scrape,
+                  search-web, enrich-contact, archive-contact,
+                  engage-post, save-draft, update-progress
+  AI Chat         8 CRM tools, streaming, conversation history
+  Analytics       5 tabs: Overview, Agents, Engagement,
+                  Content, Sync Health
+  Scheduling      Cron-based workflow scheduling
+
+Getting started:
+  1. Set ANTHROPIC_API_KEY in your environment
+  2. Run npx openvolo
+  3. Connect X or LinkedIn in Settings > Platforms
+  4. Sync contacts and run your first workflow
+
+Data:
+  Database        ~/.openvolo/data.db
+  Config          ~/.openvolo/config.json
+  Sessions        ~/.openvolo/sessions/
+  Media           ~/.openvolo/media/
+
+Environment variables:
+  ANTHROPIC_API_KEY    Claude AI (required for agents + chat)
+  BRAVE_SEARCH_API_KEY Brave Search (broad discovery)
+  TAVILY_API_KEY       Tavily Search (deep research)
+`;
+
 program
   .name("openvolo")
   .description("Agentic AI-Native Social CRM")
-  .version(pkg.version);
+  .version(pkg.version)
+  .addHelpText("after", FEATURES_HELP);
 
 program
   .option("-p, --port <number>", "Port to start the server on", String(DEFAULT_PORT))
