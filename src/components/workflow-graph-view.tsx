@@ -19,6 +19,8 @@ import {
   MessageSquare,
   Compass,
   Heart,
+  FilePlus,
+  Send,
   ChevronDown,
   ChevronRight,
   Loader2,
@@ -45,6 +47,10 @@ const STEP_TYPE_CONFIG: Record<
   tool_result: { label: "Tool Result", icon: MessageSquare, color: "text-teal-500" },
   decision: { label: "Decision", icon: Compass, color: "text-rose-500" },
   engagement_action: { label: "Engagement", icon: Heart, color: "text-pink-500" },
+  // Phase 6 content step types
+  content_create: { label: "Content Create", icon: FilePlus, color: "text-teal-500" },
+  content_publish: { label: "Content Publish", icon: Send, color: "text-blue-500" },
+  post_engagement: { label: "Post Engagement", icon: Heart, color: "text-pink-500" },
 };
 
 const STATUS_BORDER: Record<string, string> = {
