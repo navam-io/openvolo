@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -32,8 +32,12 @@ const SYNC_ACTIONS: SyncAction[] = [
 ];
 
 export function WorkflowQuickActions() {
+  const [mounted, setMounted] = useState(false);
   const [running, setRunning] = useState<string | null>(null);
   const router = useRouter();
+
+  // Defer Radix DropdownMenu render to avoid SSR hydration ID mismatch
+  useEffect(() => setMounted(true), []);
 
   async function handleAction(action: SyncAction) {
     setRunning(action.label);
@@ -59,6 +63,15 @@ export function WorkflowQuickActions() {
     } finally {
       setRunning(null);
     }
+  }
+
+  if (!mounted) {
+    return (
+      <Button variant="outline" size="sm">
+        <Plus className="mr-2 h-4 w-4" />
+        Quick Action
+      </Button>
+    );
   }
 
   return (
