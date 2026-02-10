@@ -116,6 +116,7 @@ export function ScheduleDialog({ template, open, onClose }: ScheduleDialogProps)
       }
 
       onClose();
+      window.dispatchEvent(new Event("schedule-changed"));
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create schedule");

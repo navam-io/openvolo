@@ -68,7 +68,7 @@ export function ScheduledJobsList() {
   const [templateNames, setTemplateNames] = useState<TemplateMap>({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  function refreshJobs() {
     Promise.all([
       fetch("/api/workflows/schedule").then((r) => r.json()),
       fetch("/api/workflows/templates?pageSize=50").then((r) => r.json()),
@@ -83,6 +83,14 @@ export function ScheduledJobsList() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+  }
+
+  useEffect(() => { refreshJobs(); }, []);
+
+  useEffect(() => {
+    const handler = () => refreshJobs();
+    window.addEventListener("schedule-changed", handler);
+    return () => window.removeEventListener("schedule-changed", handler);
   }, []);
 
   async function handleToggle(jobId: string, currentEnabled: number) {
