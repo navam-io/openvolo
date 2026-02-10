@@ -53,6 +53,15 @@ function parseSyncSubType(run: WorkflowRun): string | null {
   }
 }
 
+function parseTemplateName(run: WorkflowRun): string | null {
+  try {
+    const config = JSON.parse(run.config ?? "{}");
+    return config.templateName ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function formatRelativeTime(unixSeconds: number): string {
   const now = Math.floor(Date.now() / 1000);
   const diff = now - unixSeconds;
@@ -79,7 +88,8 @@ export function WorkflowRunCard({
 }) {
   const Icon = TYPE_ICONS[run.workflowType] ?? RefreshCw;
   const subType = parseSyncSubType(run);
-  const label = subType ? (SYNC_SUBTYPE_LABELS[subType] ?? subType) : run.workflowType;
+  const templateName = parseTemplateName(run);
+  const label = subType ? (SYNC_SUBTYPE_LABELS[subType] ?? subType) : (templateName ?? run.workflowType);
   const statusColor = STATUS_COLORS[run.status] ?? STATUS_COLORS.pending;
   const progressPercent =
     run.totalItems && run.totalItems > 0

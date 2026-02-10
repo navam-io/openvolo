@@ -53,6 +53,13 @@ function buildSystemPrompt(
 
   return `${base}
 
+## Execution Context
+You are running as an AUTONOMOUS background agent. There is NO human in the loop.
+- Do NOT ask questions or request clarification — make reasonable assumptions and proceed.
+- Do NOT wait for user input — you will not receive any.
+- If information is missing, use your best judgment or search for it.
+- Act decisively and complete as much as possible within your tool budget.
+
 ## Tools Available
 - **search_web**: Search the internet (auto-routes between Brave and Tavily for optimal results). Pass \`count\` to control how many results are returned.
 - **fetch_url**: Fetch and extract content from a web page URL
@@ -155,6 +162,49 @@ function buildUserPrompt(
     }
   }
 
+  // Include agent-type config (content, engagement, outreach templates)
+  if (config.workflowType === "agent" || config.workflowType === "sequence") {
+    const configFields: string[] = [];
+
+    const topics = config.config?.topics as string[] | undefined;
+    if (topics && topics.length > 0) {
+      configFields.push(`- **Topics/Industries**: ${topics.join(", ")}`);
+    }
+
+    const tone = config.config?.tone as string | undefined;
+    if (tone) {
+      configFields.push(`- **Tone**: ${tone}`);
+    }
+
+    const frequency = config.config?.frequency as string | undefined;
+    if (frequency) {
+      configFields.push(`- **Frequency**: ${frequency}`);
+    }
+
+    const maxReplies = config.config?.maxReplies as number | undefined;
+    if (maxReplies) {
+      configFields.push(`- **Max Replies**: ${maxReplies}`);
+    }
+
+    const maxEngagements = config.config?.maxEngagements as number | undefined;
+    if (maxEngagements) {
+      configFields.push(`- **Max Engagements**: ${maxEngagements}`);
+    }
+
+    const platforms = config.config?.platforms as string[] | undefined;
+    if (platforms && platforms.length > 0) {
+      configFields.push(`- **Platforms**: ${platforms.join(", ")}`);
+    }
+
+    if (configFields.length > 0) {
+      parts.push(`## Configuration\n${configFields.join("\n")}`);
+    }
+
+    if (!topics || topics.length === 0) {
+      parts.push("Note: No specific topics configured. Research broadly trending topics in technology and business.");
+    }
+  }
+
   if (parts.length === 0) {
     parts.push("Complete the workflow task using the available tools.");
   }
@@ -178,12 +228,13 @@ export async function runAgentWorkflow(
   // Load template if provided
   const template = config.templateId ? getTemplate(config.templateId) : null;
 
-  // Create the workflow run
+  // Create the workflow run — inject templateName for display
+  const runConfig = { ...config.config, ...(template ? { templateName: template.name } : {}) };
   const run = createWorkflowRun({
     workflowType: config.workflowType,
     templateId: config.templateId,
     status: "running",
-    config: JSON.stringify(config.config ?? {}),
+    config: JSON.stringify(runConfig),
     trigger: config.templateId ? "template" : "user",
     model: modelId,
     startedAt: now,
@@ -545,21 +596,24 @@ export function startAgentWorkflow(config: AgentRunConfig): WorkflowRun {
   const now = Math.floor(Date.now() / 1000);
   const modelId = config.model ?? DEFAULT_MODEL;
 
+  // Load template early so we can inject templateName into config
+  const template = config.templateId ? getTemplate(config.templateId) : null;
+
   // Create the run synchronously so we can return the ID immediately
+  const runConfig = { ...config.config, ...(template ? { templateName: template.name } : {}) };
   const run = createWorkflowRun({
     workflowType: config.workflowType,
     templateId: config.templateId,
     status: "running",
-    config: JSON.stringify(config.config ?? {}),
+    config: JSON.stringify(runConfig),
     trigger: config.templateId ? "template" : "user",
     model: modelId,
     startedAt: now,
   });
 
   // Fire-and-forget: execute the agent in the background
-  // Note: runAgentWorkflow creates its own run, so we need a variant.
-  // Instead, we'll run the agent loop inline here.
-  executeAgentLoop(run.id, config).catch((err) => {
+  // Pass pre-loaded template to avoid double fetch
+  executeAgentLoop(run.id, config, template ?? undefined).catch((err) => {
     console.error(`[agent-runner] Run ${run.id} failed:`, err);
   });
 
@@ -572,13 +626,14 @@ export function startAgentWorkflow(config: AgentRunConfig): WorkflowRun {
  */
 async function executeAgentLoop(
   runId: string,
-  config: AgentRunConfig
+  config: AgentRunConfig,
+  preloadedTemplate?: ReturnType<typeof getTemplate>
 ): Promise<void> {
   const now = Math.floor(Date.now() / 1000);
   const modelId = config.model ?? DEFAULT_MODEL;
   const maxSteps = config.maxSteps ?? MAX_STEPS_DEFAULT;
 
-  const template = config.templateId ? getTemplate(config.templateId) : null;
+  const template = preloadedTemplate ?? (config.templateId ? getTemplate(config.templateId) : null);
 
   const systemPrompt = buildSystemPrompt(
     template?.systemPrompt,

@@ -60,6 +60,19 @@ export function ActivateDialog({ template, open, onClose }: ActivateDialogProps)
     String(templateConfig.inactivityDays ?? 365)
   );
 
+  // Content template fields
+  const [topics, setTopics] = useState(
+    (templateConfig.topics as string[] ?? []).join(", ")
+  );
+  const [tone, setTone] = useState(
+    String(templateConfig.tone ?? "professional")
+  );
+
+  // Engagement/Outreach template fields
+  const [maxEngagements, setMaxEngagements] = useState(
+    String(templateConfig.maxEngagements ?? templateConfig.maxReplies ?? 10)
+  );
+
   async function handleActivate() {
     setRunning(true);
     setError(null);
@@ -79,6 +92,18 @@ export function ActivateDialog({ template, open, onClose }: ActivateDialogProps)
         config.maxContacts = parseInt(maxContacts, 10) || 20;
         config.companyName = companyName || undefined;
         config.inactivityDays = parseInt(inactivityDays, 10) || 365;
+      }
+      if (template.templateType === "content") {
+        const topicsList = topics.split(",").map((t) => t.trim()).filter(Boolean);
+        if (topicsList.length > 0) config.topics = topicsList;
+        if (tone) config.tone = tone;
+      }
+      if (template.templateType === "engagement" || template.templateType === "outreach") {
+        const maxEng = parseInt(maxEngagements, 10);
+        if (maxEng > 0) {
+          config.maxEngagements = maxEng;
+          config.maxReplies = maxEng;
+        }
       }
 
       const res = await fetch(`/api/workflows/templates/${template.id}/activate`, {
@@ -201,6 +226,50 @@ export function ActivateDialog({ template, open, onClose }: ActivateDialogProps)
                 />
               </div>
             </>
+          )}
+
+          {template.templateType === "content" && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="topics">Topics / Industries</Label>
+                <Input
+                  id="topics"
+                  placeholder="AI, fintech, developer tools"
+                  value={topics}
+                  onChange={(e) => setTopics(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Comma-separated list of topics to research and write about.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="tone">Tone</Label>
+                <Input
+                  id="tone"
+                  placeholder="professional"
+                  value={tone}
+                  onChange={(e) => setTone(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Writing style: professional, casual, provocative, etc.
+                </p>
+              </div>
+            </>
+          )}
+
+          {(template.templateType === "engagement" || template.templateType === "outreach") && (
+            <div className="space-y-2">
+              <Label htmlFor="max-engagements">Max Engagements</Label>
+              <Input
+                id="max-engagements"
+                type="number"
+                value={maxEngagements}
+                onChange={(e) => setMaxEngagements(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Maximum posts to engage with per run.
+              </p>
+            </div>
           )}
 
           <Separator />

@@ -19,6 +19,9 @@ export async function register() {
       if (result.seeded > 0) {
         console.log(`[instrumentation] Seeded ${result.seeded} workflow templates`);
       }
+      if (result.updated > 0) {
+        console.log(`[instrumentation] Updated ${result.updated} workflow template prompts`);
+      }
     } catch (e) {
       // Seed may fail if tables don't exist yet
       console.warn("[instrumentation] Seeding skipped:", (e as Error).message);

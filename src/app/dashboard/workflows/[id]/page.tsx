@@ -58,8 +58,19 @@ export default async function WorkflowDetailPage({
     const config = JSON.parse(run.config ?? "{}");
     if (config.syncSubType && SYNC_SUBTYPE_LABELS[config.syncSubType]) {
       title = SYNC_SUBTYPE_LABELS[config.syncSubType];
+    } else if (config.templateName) {
+      title = config.templateName;
     }
   } catch { /* ignore */ }
+
+  // Fallback: look up template name for older runs that don't have it in config
+  if (title.endsWith(" Workflow") && run.templateId) {
+    try {
+      const { getTemplate } = await import("@/lib/db/queries/workflow-templates");
+      const tmpl = getTemplate(run.templateId);
+      if (tmpl?.name) title = tmpl.name;
+    } catch { /* ignore */ }
+  }
 
   return (
     <div className="space-y-6 overflow-hidden">

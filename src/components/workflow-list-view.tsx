@@ -75,6 +75,15 @@ function parseSyncSubType(run: WorkflowRun): string | null {
   }
 }
 
+function parseTemplateName(run: WorkflowRun): string | null {
+  try {
+    const config = JSON.parse(run.config ?? "{}");
+    return config.templateName ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function formatDuration(startedAt: number | null, completedAt: number | null): string {
   if (!startedAt) return "-";
   const end = completedAt ?? Math.floor(Date.now() / 1000);
@@ -122,6 +131,9 @@ export function WorkflowListView({ runs }: { runs: WorkflowRun[] }) {
             const Icon = TYPE_ICONS[run.workflowType] ?? RefreshCw;
             const subType = parseSyncSubType(run);
             const subLabel = subType ? (SYNC_SUBTYPE_LABELS[subType] ?? null) : null;
+            const templateName = parseTemplateName(run);
+            const displayName = subLabel ?? templateName ?? (TYPE_LABELS[run.workflowType] ?? run.workflowType);
+            const hasSecondaryLabel = !!(subLabel || templateName);
             const statusConfig = STATUS_CONFIG[run.status] ?? STATUS_CONFIG.pending;
             const StatusIcon = statusConfig.icon;
 
@@ -137,9 +149,9 @@ export function WorkflowListView({ runs }: { runs: WorkflowRun[] }) {
                 <TableCell>
                   <Link href={`/dashboard/workflows/${run.id}`} className="block">
                     <span className="text-sm font-medium">
-                      {subLabel ?? (TYPE_LABELS[run.workflowType] ?? run.workflowType)}
+                      {displayName}
                     </span>
-                    {subLabel && (
+                    {hasSecondaryLabel && (
                       <span className="text-xs text-muted-foreground ml-2">
                         {TYPE_LABELS[run.workflowType]}
                       </span>

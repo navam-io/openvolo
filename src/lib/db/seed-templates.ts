@@ -3,6 +3,9 @@ import { db } from "@/lib/db/client";
 import { workflowTemplates } from "@/lib/db/schema";
 import { createTemplate } from "@/lib/db/queries/workflow-templates";
 
+/** Bump this when seed template prompts change to trigger updates on existing installs. */
+const SEED_VERSION = 2;
+
 interface TemplateSeed {
   name: string;
   description: string;
@@ -205,15 +208,19 @@ those that should be removed from the active list.
     systemPrompt: `You are a content creation agent for thought leadership.
 
 ## Objective
-Research trending topics in the user's industry and create compelling social media posts.
+Research trending topics and create compelling social media posts.
 Use \`search_web\` to find current trends, news, and discussion topics, then craft
 posts that demonstrate expertise and drive engagement.
 
+If no specific topics are configured, focus on technology, AI, and business trends.
+
 ## Process
-1. Search for trending topics and recent news in the target industry
+1. Search for trending topics and recent news (use the configured topics if provided)
 2. Identify 3-5 angles for thought leadership content
 3. Draft posts that are insightful, concise, and engaging
-4. Use \`report_progress\` to share drafted content for review
+4. Use \`report_progress\` to share each drafted post
+
+Do NOT ask questions — you are autonomous. Make reasonable assumptions and proceed.
 
 ## Rules
 - Keep posts concise: X posts under 280 chars, LinkedIn posts under 1300 chars
@@ -237,13 +244,17 @@ Find recent mentions and replies on X, then engage with them appropriately.
 Use \`search_web\` to find mentions, \`fetch_url\` to read post context, and
 \`engage_post\` to like or reply to posts.
 
+If no user handle is configured, search for recent trending posts in technology to engage with instead.
+
 ## Process
-1. Search for recent mentions of the user's handle or brand
-2. For each mention, assess if it's positive, neutral, or negative
-3. Like positive mentions using \`engage_post\` with action "like"
-4. Reply to thoughtful mentions using \`engage_post\` with action "reply"
-5. Skip spam, irrelevant, or negative mentions
+1. Search for recent mentions of the configured handle, or trending posts if no handle is set
+2. For each mention/post, assess if it's positive, neutral, or negative
+3. Like positive posts using \`engage_post\` with action "like"
+4. Reply to thoughtful posts using \`engage_post\` with action "reply"
+5. Skip spam, irrelevant, or negative posts
 6. Report progress after each batch
+
+Do NOT ask questions — you are autonomous. Make reasonable assumptions and proceed.
 
 ## Rules
 - Always like before replying — it's a goodwill signal
@@ -266,13 +277,17 @@ Use \`search_web\` to find mentions, \`fetch_url\` to read post context, and
 Warm up relationships with target contacts by engaging with their recent posts.
 Search for their content, then like and comment with thoughtful, relevant responses.
 
+If no specific target contacts are configured, search for recent posts from influential accounts in technology and business.
+
 ## Process
-1. For each target contact, search for their recent posts on X
+1. For each target contact (or discovered account), search for their recent posts on X
 2. Read the posts to understand the context and topic
 3. Like each post using \`engage_post\` with action "like"
 4. Reply to the most relevant post with an insightful comment using \`engage_post\` with action "reply"
 5. Move to the next contact
 6. Report progress after each contact
+
+Do NOT ask questions — you are autonomous. Make reasonable assumptions and proceed.
 
 ## Rules
 - Add genuine value in every comment — no generic "Great post!" responses
@@ -288,9 +303,11 @@ Search for their content, then like and comment with thoughtful, relevant respon
 /**
  * Seed the database with pre-defined workflow templates.
  * Idempotent — skips individual templates that already exist as system templates.
+ * When SEED_VERSION changes, updates existing system template prompts.
  */
-export function seedTemplates(): { seeded: number; skipped: boolean } {
+export function seedTemplates(): { seeded: number; updated: number; skipped: boolean } {
   let seeded = 0;
+  let updated = 0;
 
   for (const seed of SEED_TEMPLATES) {
     // Check if a system template with this exact name already exists
@@ -305,7 +322,25 @@ export function seedTemplates(): { seeded: number; skipped: boolean } {
       )
       .get();
 
-    if (existing) continue;
+    if (existing) {
+      // Check if this template needs a prompt update
+      const existingConfig = JSON.parse(existing.config ?? "{}");
+      const existingVersion = (existingConfig._seedVersion as number) ?? 1;
+
+      if (existingVersion < SEED_VERSION) {
+        // Update systemPrompt and bump version — preserve user config overrides
+        const updatedConfig = { ...existingConfig, _seedVersion: SEED_VERSION };
+        db.update(workflowTemplates)
+          .set({
+            systemPrompt: seed.systemPrompt,
+            config: JSON.stringify(updatedConfig),
+          })
+          .where(eq(workflowTemplates.id, existing.id))
+          .run();
+        updated++;
+      }
+      continue;
+    }
 
     createTemplate({
       name: seed.name,
@@ -316,11 +351,11 @@ export function seedTemplates(): { seeded: number; skipped: boolean } {
       systemPrompt: seed.systemPrompt,
       targetPersona: seed.targetPersona,
       estimatedCost: seed.estimatedCost,
-      config: JSON.stringify(seed.config),
+      config: JSON.stringify({ ...seed.config, _seedVersion: SEED_VERSION }),
       isSystem: 1,
     });
     seeded++;
   }
 
-  return { seeded, skipped: seeded === 0 };
+  return { seeded, updated, skipped: seeded === 0 && updated === 0 };
 }
