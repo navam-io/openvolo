@@ -376,7 +376,7 @@ export const workflowSteps = sqliteTable("workflow_steps", {
       // Agent step types (merged from agent_steps)
       "thinking", "tool_call", "tool_result", "decision", "engagement_action",
       // Phase 6 step types
-      "content_publish", "post_engagement",
+      "content_create", "content_publish", "post_engagement",
     ],
   }).notNull(),
   status: text("status", {

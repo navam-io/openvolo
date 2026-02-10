@@ -4,7 +4,7 @@ import { workflowTemplates } from "@/lib/db/schema";
 import { createTemplate } from "@/lib/db/queries/workflow-templates";
 
 /** Bump this when seed template prompts change to trigger updates on existing installs. */
-const SEED_VERSION = 2;
+const SEED_VERSION = 3;
 
 interface TemplateSeed {
   name: string;
@@ -218,7 +218,8 @@ If no specific topics are configured, focus on technology, AI, and business tren
 1. Search for trending topics and recent news (use the configured topics if provided)
 2. Identify 3-5 angles for thought leadership content
 3. Draft posts that are insightful, concise, and engaging
-4. Use \`report_progress\` to share each drafted post
+4. For each post, use \`save_draft\` to save it as a content draft (set platformTarget to "x" or "linkedin")
+5. Use \`report_progress\` to summarize what you saved after each batch
 
 Do NOT ask questions — you are autonomous. Make reasonable assumptions and proceed.
 
@@ -227,7 +228,8 @@ Do NOT ask questions — you are autonomous. Make reasonable assumptions and pro
 - Include a clear point of view — avoid generic statements
 - Add relevant hashtags (2-3 max)
 - Vary post formats: questions, hot takes, data points, stories
-- Never fabricate statistics or quotes`,
+- Never fabricate statistics or quotes
+- Always use \`save_draft\` to persist each post — do NOT just report them via \`report_progress\``,
     config: { topics: [], tone: "professional", frequency: "daily" },
   },
   {

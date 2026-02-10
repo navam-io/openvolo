@@ -16,6 +16,7 @@ import { searchWeb } from "@/lib/agents/tools/search-web";
 import { enrichContact } from "@/lib/agents/tools/enrich-contact";
 import { archiveContactTool } from "@/lib/agents/tools/archive-contact";
 import { engagePost } from "@/lib/agents/tools/engage-post";
+import { saveDraft } from "@/lib/agents/tools/save-draft";
 import { updateProgress } from "@/lib/agents/tools/update-progress";
 import { routeUrl, shouldEscalateToBrowser } from "@/lib/agents/router";
 import type { AgentRunConfig } from "@/lib/agents/types";
@@ -68,6 +69,7 @@ You are running as an AUTONOMOUS background agent. There is NO human in the loop
 - **enrich_contact**: Update an existing contact with new data (fill gaps only)
 - **archive_contact**: Archive a contact with a reason (used during prune workflows)
 - **engage_post**: Engage with a post on X or LinkedIn (like, reply, or retweet) via browser automation
+- **save_draft**: Save a content draft (post, article, thread, etc.) to the CRM content library
 - **report_progress**: Report progress during execution
 
 ## Guidelines
@@ -258,6 +260,7 @@ export async function runAgentWorkflow(
       model: anthropic(modelId),
       system: systemPrompt,
       prompt: userPrompt,
+      maxOutputTokens: 16000,
       stopWhen: stepCountIs(maxSteps),
       tools: {
         search_web: tool({
@@ -477,6 +480,21 @@ export async function runAgentWorkflow(
           },
         }),
 
+        save_draft: tool({
+          description:
+            "Save a content draft to the CRM content library. Use this to persist generated posts, articles, or other content as drafts that will appear in Content > Drafts.",
+          inputSchema: z.object({
+            title: z.string().optional().describe("Title for the content item"),
+            body: z.string().describe("The full content/post text"),
+            contentType: z.string().optional().describe("Content type: post, article, thread, reply (default: post)"),
+            platformTarget: z.string().optional().describe("Target platform: x, linkedin, etc."),
+            generationPrompt: z.string().optional().describe("The prompt that generated this content"),
+          }),
+          execute: async (params) => {
+            return saveDraft(params, runId);
+          },
+        }),
+
         report_progress: tool({
           description:
             "Report your current progress. Use this after completing major steps to keep the user informed.",
@@ -510,7 +528,7 @@ export async function runAgentWorkflow(
           stepType: "thinking",
           status: "completed",
           tool: "llm",
-          output: JSON.stringify({ text: step.text.slice(0, 2000) }),
+          output: JSON.stringify({ text: step.text.slice(0, 4000) }),
         });
       }
 
@@ -535,7 +553,7 @@ export async function runAgentWorkflow(
 
     // Build result summary
     const resultData: Record<string, unknown> = {
-      finalText: result.text?.slice(0, 2000) ?? "",
+      finalText: result.text?.slice(0, 8000) ?? "",
       stepsCount: result.steps.length,
     };
 
@@ -653,6 +671,7 @@ async function executeAgentLoop(
       model: anthropic(modelId),
       system: systemPrompt,
       prompt: userPrompt,
+      maxOutputTokens: 16000,
       stopWhen: stepCountIs(maxSteps),
       tools: {
         search_web: tool({
@@ -842,6 +861,21 @@ async function executeAgentLoop(
           },
         }),
 
+        save_draft: tool({
+          description:
+            "Save a content draft to the CRM content library. Persists posts, articles, or threads as drafts.",
+          inputSchema: z.object({
+            title: z.string().optional().describe("Title for the content item"),
+            body: z.string().describe("The full content/post text"),
+            contentType: z.string().optional().describe("Content type: post, article, thread, reply (default: post)"),
+            platformTarget: z.string().optional().describe("Target platform: x, linkedin, etc."),
+            generationPrompt: z.string().optional().describe("The prompt that generated this content"),
+          }),
+          execute: async (params) => {
+            return saveDraft(params, runId);
+          },
+        }),
+
         report_progress: tool({
           description: "Report your current progress.",
           inputSchema: z.object({
@@ -865,7 +899,7 @@ async function executeAgentLoop(
           stepType: "thinking",
           status: "completed",
           tool: "llm",
-          output: JSON.stringify({ text: step.text.slice(0, 2000) }),
+          output: JSON.stringify({ text: step.text.slice(0, 4000) }),
         });
       }
     }
@@ -876,7 +910,7 @@ async function executeAgentLoop(
 
     // Build result summary
     const resultData: Record<string, unknown> = {
-      finalText: result.text?.slice(0, 2000) ?? "",
+      finalText: result.text?.slice(0, 8000) ?? "",
       stepsCount: result.steps.length,
     };
 
