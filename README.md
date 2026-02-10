@@ -44,13 +44,13 @@ OAuth 2.0 with OpenID Connect, profile sync, and CSV import for connections (no 
 Google People API contact sync with 2-tier deduplication (identity match then email match). Email metadata enrichment tracks message frequency (sent/received in last 30 days) per contact — no email content is stored.
 
 ### Content Library
-Import tweets and mentions, compose new posts, draft and publish workflow with thread support. Six content types (post, thread, article, newsletter, DM, reply). AI-powered draft generation via the `save-draft` agent tool. Engagement metrics tracked over time with both JSON snapshots (fast display) and structured rows (time-series analysis).
+Import posts and mentions from X, LinkedIn, and Gmail. Filter by platform to focus on a single channel. Multi-platform compose with platform-aware constraints (X: 280 chars + threads, LinkedIn: 3,000 char drafts). Platform-aware engagement display with per-platform action labels. Six content types (post, thread, article, newsletter, DM, reply). AI-powered draft generation via the `save-draft` agent tool. Engagement metrics tracked over time with both JSON snapshots (fast display) and structured rows (time-series analysis).
 
 ### Task Management
 Create, update, and track tasks with status and priority. Link tasks to contacts for relationship-aware workflows.
 
-### Workflow Engine
-Six workflow types: sync, enrich, search, prune, sequence, and agent. Template gallery with 10 seed templates (3 search, 3 enrich, 2 prune, plus user-created), activation dialog for quick setup. User template builder lets you clone any system template and customize it. Four visualization modes (list, kanban, swimlane, graph) with run/step observability and per-step cost tracking. Cron-based workflow scheduling with presets, custom expressions, and a 60-second background runner.
+### Automation Hub
+Three-tab Automation page — **Agents** (gallery + builder), **Actions** (platform sync operations), **Runs** (execution history). Six workflow types: sync, enrich, search, prune, sequence, and agent. Agent gallery with 10 seed agents (3 search, 3 enrich, 2 prune, plus user-created), activation dialog for quick setup. User agent builder lets you clone any system agent and customize it. Actions tab consolidates all sync operations (X, LinkedIn, Gmail) with platform connection awareness. Four visualization modes (list, kanban, swimlane, graph) with run/step observability and per-step cost tracking. Cron-based workflow scheduling with presets, custom expressions, and a 60-second background runner.
 
 ### AI Agent Runner
 Eight agent tools — url-fetch (Cheerio), browser-scrape (Playwright), search-web (Brave + Tavily), enrich-contact, update-progress, archive-contact (prune workflows), save-draft (AI content generation), and engage-post (template-driven engagement). Domain-based routing engine (e.g. x.com → browser, wikipedia → fetch) with automatic escalation on failure.
@@ -68,7 +68,7 @@ Dual search providers: Brave for broad discovery, Tavily for deep research. Inte
 Five-tab dashboard — Overview, Agents, Engagement, Content, Sync Health. Six reusable chart components (area, bar, donut, ranked table, stat cards, skeleton). Time range filtering across all tabs.
 
 ### AI Chat Assistant
-Streaming chat panel (Cmd+K) powered by Vercel AI SDK 6. Eight CRM tools for querying contacts, analytics, workflows, and content — plus creating contacts, tasks, and starting workflows — all conversationally. Page-aware context injection adapts responses to your current view. Smart prompts suggest relevant queries based on your current page. Save conversations and continue them later from the searchable history panel.
+Streaming chat panel (Cmd+K) powered by Vercel AI SDK 6. Eight CRM tools for querying contacts, analytics, workflows, and content — plus creating contacts, tasks, and starting agents — all conversationally. Page-aware context injection adapts responses to your current view. Smart prompts suggest relevant queries based on your current page. Save conversations and continue them later from the searchable history panel.
 
 ### Browser Enrichment
 Playwright-based profile scraping with anti-detection measures, LLM-powered field extraction, and session persistence for authenticated scraping.
@@ -163,9 +163,9 @@ src/
     dashboard/                        # UI routes
       contacts/                       #   Contact list + detail
       content/                        #   Content list + detail + compose
-      workflows/                      #   Workflow list + detail + template gallery
+      workflows/                      #   Automation hub (agents, actions, runs) + detail
       analytics/                      #   Analytics dashboard (5-tab)
-      settings/                       #   Platform connections + search API keys
+      settings/                       #   Platform connections + API keys (config only)
       help/                           #   Setup guides
   lib/
     db/
@@ -209,6 +209,7 @@ npm run lint             # ESLint
 - [x] **Phase 3** — Unified Workflows, Agent Runner, Smart Search Routing, Prune Execution, Workflow Scheduling
 - [x] **Phase 4** — Analytics Dashboard (5-tab with charts)
 - [x] **Phase 5** — AI Chat Assistant (8 CRM tools, streaming, smart prompts, conversation history)
+- [x] **Phase 5.5** — Multi-Channel Content & Automation (platform-agnostic content, multi-platform compose, Automation hub with Agents/Actions/Runs tabs)
 - [ ] **Phase 6** — Content & Demand Gen (media system, browser publishing, AI content creation, goals, user templates — 6E complete)
 
 ## License
