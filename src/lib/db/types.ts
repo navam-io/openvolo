@@ -3,6 +3,7 @@ import {
   contacts,
   contactIdentities,
   tasks,
+  chatConversations,
   workflowTemplates,
   workflowTemplateSteps,
   workflowEnrollments,
@@ -28,6 +29,10 @@ export type ContactWithIdentities = Contact & { identities: ContactIdentity[] };
 // Task types
 export type Task = InferSelectModel<typeof tasks>;
 export type NewTask = InferInsertModel<typeof tasks>;
+
+// Chat conversation types
+export type ChatConversation = InferSelectModel<typeof chatConversations>;
+export type NewChatConversation = InferInsertModel<typeof chatConversations>;
 
 // Platform account types
 export type PlatformAccount = InferSelectModel<typeof platformAccounts>;

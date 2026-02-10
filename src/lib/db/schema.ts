@@ -416,6 +416,16 @@ export const engagementMetrics = sqliteTable("engagement_metrics", {
   index("idx_engagement_metrics_snapshot").on(table.snapshotAt),
 ]);
 
+// --- Chat Conversations (saved chat sessions) ---
+
+export const chatConversations = sqliteTable("chat_conversations", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  messages: text("messages").notNull(),          // JSON-serialized UIMessage[]
+  messageCount: integer("message_count").notNull().default(0),
+  ...timestamps,
+});
+
 // --- Scheduled Jobs ---
 
 export const scheduledJobs = sqliteTable("scheduled_jobs", {
