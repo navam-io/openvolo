@@ -228,8 +228,11 @@ export async function runAgentWorkflow(
   // Load template if provided
   const template = config.templateId ? getTemplate(config.templateId) : null;
 
-  // Create the workflow run — inject templateName for display
-  const runConfig = { ...config.config, ...(template ? { templateName: template.name } : {}) };
+  // Create the workflow run — inject templateName + templateCategory for display
+  const runConfig = {
+    ...config.config,
+    ...(template ? { templateName: template.name, templateCategory: template.templateType } : {}),
+  };
   const run = createWorkflowRun({
     workflowType: config.workflowType,
     templateId: config.templateId,
@@ -600,7 +603,10 @@ export function startAgentWorkflow(config: AgentRunConfig): WorkflowRun {
   const template = config.templateId ? getTemplate(config.templateId) : null;
 
   // Create the run synchronously so we can return the ID immediately
-  const runConfig = { ...config.config, ...(template ? { templateName: template.name } : {}) };
+  const runConfig = {
+    ...config.config,
+    ...(template ? { templateName: template.name, templateCategory: template.templateType } : {}),
+  };
   const run = createWorkflowRun({
     workflowType: config.workflowType,
     templateId: config.templateId,

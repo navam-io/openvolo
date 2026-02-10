@@ -13,14 +13,38 @@ import {
 import { WorkflowRunCard } from "@/components/workflow-run-card";
 import type { WorkflowRun } from "@/lib/db/types";
 
+/** All possible lanes — ordered by display priority. */
 const LANES = [
   { key: "sync", label: "Sync", icon: RefreshCw },
-  { key: "enrich", label: "Enrich", icon: Sparkles },
-  { key: "sequence", label: "Sequence", icon: Megaphone },
-  { key: "agent", label: "Agent", icon: Bot },
   { key: "search", label: "Search", icon: Search },
+  { key: "enrich", label: "Enrich", icon: Sparkles },
   { key: "prune", label: "Prune", icon: Trash2 },
+  { key: "content", label: "Content", icon: Bot },
+  { key: "engagement", label: "Engage", icon: Bot },
+  { key: "outreach", label: "Outreach", icon: Megaphone },
+  { key: "agent", label: "Agent", icon: Bot },
 ] as const;
+
+/** Map templateCategory to lane key. Falls back to workflowType. */
+const CATEGORY_TO_LANE: Record<string, string> = {
+  prospecting: "search",
+  enrichment: "enrich",
+  pruning: "prune",
+  content: "content",
+  engagement: "engagement",
+  outreach: "outreach",
+  nurture: "agent",
+};
+
+function getLaneKey(run: WorkflowRun): string {
+  try {
+    const config = JSON.parse(run.config ?? "{}");
+    if (config.templateCategory) {
+      return CATEGORY_TO_LANE[config.templateCategory] ?? run.workflowType;
+    }
+  } catch { /* fall through */ }
+  return run.workflowType;
+}
 
 export function WorkflowSwimlaneView({ runs }: { runs: WorkflowRun[] }) {
   const grouped: Record<string, WorkflowRun[]> = {};
@@ -28,8 +52,9 @@ export function WorkflowSwimlaneView({ runs }: { runs: WorkflowRun[] }) {
     grouped[lane.key] = [];
   }
   for (const run of runs) {
-    if (grouped[run.workflowType]) {
-      grouped[run.workflowType].push(run);
+    const laneKey = getLaneKey(run);
+    if (grouped[laneKey]) {
+      grouped[laneKey].push(run);
     }
   }
 

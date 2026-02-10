@@ -44,6 +44,17 @@ const TYPE_LABELS: Record<string, string> = {
   agent: "Agent",
 };
 
+/** Human-friendly labels for template categories (from templateType). */
+const CATEGORY_LABELS: Record<string, string> = {
+  prospecting: "Search",
+  enrichment: "Enrich",
+  pruning: "Prune",
+  content: "Content",
+  engagement: "Engage",
+  outreach: "Outreach",
+  nurture: "Nurture",
+};
+
 const STATUS_CONFIG: Record<
   string,
   { label: string; variant: "default" | "secondary" | "destructive" | "outline"; icon: typeof CheckCircle }
@@ -79,6 +90,15 @@ function parseTemplateName(run: WorkflowRun): string | null {
   try {
     const config = JSON.parse(run.config ?? "{}");
     return config.templateName ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function parseTemplateCategory(run: WorkflowRun): string | null {
+  try {
+    const config = JSON.parse(run.config ?? "{}");
+    return config.templateCategory ?? null;
   } catch {
     return null;
   }
@@ -132,8 +152,12 @@ export function WorkflowListView({ runs }: { runs: WorkflowRun[] }) {
             const subType = parseSyncSubType(run);
             const subLabel = subType ? (SYNC_SUBTYPE_LABELS[subType] ?? null) : null;
             const templateName = parseTemplateName(run);
+            const templateCategory = parseTemplateCategory(run);
             const displayName = subLabel ?? templateName ?? (TYPE_LABELS[run.workflowType] ?? run.workflowType);
             const hasSecondaryLabel = !!(subLabel || templateName);
+            // Use templateCategory for the type badge (e.g. "Content" instead of "Agent")
+            const typeLabel = (templateCategory ? CATEGORY_LABELS[templateCategory] : null)
+              ?? TYPE_LABELS[run.workflowType] ?? run.workflowType;
             const statusConfig = STATUS_CONFIG[run.status] ?? STATUS_CONFIG.pending;
             const StatusIcon = statusConfig.icon;
 
@@ -153,7 +177,7 @@ export function WorkflowListView({ runs }: { runs: WorkflowRun[] }) {
                     </span>
                     {hasSecondaryLabel && (
                       <span className="text-xs text-muted-foreground ml-2">
-                        {TYPE_LABELS[run.workflowType]}
+                        {typeLabel}
                       </span>
                     )}
                   </Link>

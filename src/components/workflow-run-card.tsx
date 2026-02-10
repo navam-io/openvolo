@@ -25,6 +25,15 @@ const TYPE_ICONS: Record<string, typeof RefreshCw> = {
   agent: Bot,
 };
 
+const TYPE_LABELS: Record<string, string> = {
+  sync: "Sync",
+  enrich: "Enrich",
+  search: "Search",
+  prune: "Prune",
+  sequence: "Sequence",
+  agent: "Agent",
+};
+
 const STATUS_COLORS: Record<string, string> = {
   pending: "bg-muted-foreground",
   running: "bg-blue-500",
@@ -89,7 +98,7 @@ export function WorkflowRunCard({
   const Icon = TYPE_ICONS[run.workflowType] ?? RefreshCw;
   const subType = parseSyncSubType(run);
   const templateName = parseTemplateName(run);
-  const label = subType ? (SYNC_SUBTYPE_LABELS[subType] ?? subType) : (templateName ?? run.workflowType);
+  const label = subType ? (SYNC_SUBTYPE_LABELS[subType] ?? subType) : (templateName ?? TYPE_LABELS[run.workflowType] ?? run.workflowType);
   const statusColor = STATUS_COLORS[run.status] ?? STATUS_COLORS.pending;
   const progressPercent =
     run.totalItems && run.totalItems > 0

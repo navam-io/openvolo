@@ -16,11 +16,18 @@ function Breadcrumb() {
 
   if (segments.length <= 1) return null;
 
+  // Filter out ID-like segments (nanoids) from the breadcrumb — they aren't informative.
+  // The detail page already shows the resolved title prominently.
+  const displaySegments = segments.filter(
+    (seg) => !/^[A-Za-z0-9_-]{15,}$/.test(seg)
+  );
+
   return (
     <nav className="flex items-center gap-1.5 text-sm text-muted-foreground">
-      {segments.map((segment, i) => {
-        const href = "/" + segments.slice(0, i + 1).join("/");
-        const isLast = i === segments.length - 1;
+      {displaySegments.map((segment, i) => {
+        const segIndex = segments.indexOf(segment);
+        const href = "/" + segments.slice(0, segIndex + 1).join("/");
+        const isLast = i === displaySegments.length - 1;
         const label = segment.charAt(0).toUpperCase() + segment.slice(1);
 
         return (
