@@ -1,4 +1,4 @@
-import { eq, and, desc, count, SQL, like } from "drizzle-orm";
+import { eq, ne, and, desc, count, SQL, like } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db } from "@/lib/db/client";
 import { contentItems, contentPosts, engagementMetrics } from "@/lib/db/schema";
@@ -49,6 +49,7 @@ export function listContentItems(opts?: {
   origin?: string;
   platform?: string;
   status?: string;
+  excludeStatus?: string;
   platformAccountId?: string;
   threadId?: string;
   page?: number;
@@ -69,6 +70,11 @@ export function listContentItems(opts?: {
   if (opts?.status) {
     conditions.push(
       eq(contentItems.status, opts.status as ContentItem["status"])
+    );
+  }
+  if (opts?.excludeStatus) {
+    conditions.push(
+      ne(contentItems.status, opts.excludeStatus as ContentItem["status"])
     );
   }
   if (opts?.platformAccountId) {

@@ -250,7 +250,7 @@ function ContentListInner({
           <Table className="table-fixed">
             <TableHeader>
               <TableRow>
-                <TableHead>Content</TableHead>
+                <TableHead className="max-w-0 overflow-hidden">Content</TableHead>
                 <TableHead className="w-28">Type</TableHead>
                 <TableHead className="w-36">Engagement</TableHead>
                 <TableHead className="w-32">Date</TableHead>
@@ -268,7 +268,7 @@ function ContentListInner({
                     className="hover:bg-accent/30 transition-colors cursor-pointer"
                     onClick={() => router.push(`/dashboard/content/${item.id}`)}
                   >
-                    <TableCell>
+                    <TableCell className="max-w-0 overflow-hidden">
                       <div className="space-y-1">
                         {item.title && (
                           <p className="font-medium text-sm">{truncate(item.title, 60)}</p>

@@ -13,6 +13,7 @@ export default async function ContentPage({
     contentType: params.type,
     origin: params.origin,
     status: params.status,
+    excludeStatus: params.origin && !params.status ? "draft" : undefined,
     page,
     pageSize,
   });
