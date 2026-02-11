@@ -13,11 +13,18 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PostInput } from "@/components/post-input";
-import { Loader2, Plus, ListOrdered, AlignLeft } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Loader2, Plus, ListOrdered, AlignLeft, Globe, Eye, ExternalLink } from "lucide-react";
 import type { MediaThumbnailItem } from "@/components/media-thumbnail-grid";
 import { validateMediaFile, validateMediaSet } from "@/lib/media/constraints";
 
 type Platform = "x" | "linkedin";
+type PublishMode = "auto" | "review";
 
 interface MediaAttachment extends MediaThumbnailItem {
   assetId?: string; // DB ID after upload completes
@@ -74,7 +81,9 @@ export function ComposeDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [publishProgress, setPublishProgress] = useState<string | null>(null);
+  const [publishResult, setPublishResult] = useState<{ url?: string } | null>(null);
   const [loadingDraft, setLoadingDraft] = useState(false);
+  const [publishMode, setPublishMode] = useState<PublishMode>("auto");
   const blobUrlsRef = useRef<string[]>([]);
 
   const config = PLATFORM_CONFIG[platform];
@@ -88,6 +97,7 @@ export function ComposeDialog({
       setThreadMode(false);
       setError(null);
       setPublishProgress(null);
+      setPublishResult(null);
       return;
     }
 
@@ -331,15 +341,17 @@ export function ComposeDialog({
   const hasMedia = posts.some((t) => t.media.length > 0);
   const hasOverflow = posts.some((t) => t.body.length > config.maxChars);
   const isUploading = posts.some((t) => t.media.some((m) => m.uploading));
-  const canPublish = (hasContent || hasMedia) && !hasOverflow && !publishing && !saving && !isUploading && platform === "x";
+  const canPublish = (hasContent || hasMedia) && !hasOverflow && !publishing && !saving && !isUploading;
   const canSaveDraft = (hasContent || hasMedia) && !publishing && !saving && !isUploading;
 
-  async function handlePublish() {
-    if (!canPublish) return;
+  /** X API publish (existing path — X only). */
+  async function handleApiPublish() {
+    if (!canPublish || platform !== "x") return;
     setPublishing(true);
     setError(null);
+    setPublishResult(null);
     setPublishProgress(
-      threadMode ? `Publishing thread (${posts.length} posts)...` : "Publishing..."
+      threadMode ? `Publishing thread (${posts.length} posts)...` : "Publishing via API..."
     );
 
     try {
@@ -370,6 +382,94 @@ export function ComposeDialog({
     } finally {
       setPublishing(false);
       setPublishProgress(null);
+    }
+  }
+
+  /** Browser publish: save draft first, then call /api/content/publish. */
+  async function handleBrowserPublish() {
+    if (!canPublish) return;
+    setPublishing(true);
+    setError(null);
+    setPublishResult(null);
+
+    const modeLabel = publishMode === "review" ? "review" : "auto";
+    setPublishProgress(
+      publishMode === "review"
+        ? "Browser opened — review and publish in the browser window..."
+        : `Publishing via browser (${modeLabel})...`
+    );
+
+    try {
+      // Step 1: Save as draft to get a contentItemId
+      const mediaAssetIds = posts.map((t) =>
+        t.media.filter((m) => m.assetId).map((m) => m.assetId!)
+      );
+
+      const draftRes = await fetch(`/api/platforms/${platform}/compose`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tweets: posts.map((t) => t.body),
+          saveAsDraft: true,
+          draftId: draftId || undefined,
+          platformTarget: platform,
+          mediaAssetIds,
+        }),
+      });
+
+      const draftData = await draftRes.json();
+      if (!draftRes.ok) {
+        setError(typeof draftData.error === "string" ? draftData.error : "Failed to save draft");
+        return;
+      }
+
+      const contentItemId = draftData.contentItemId || draftData.id;
+      if (!contentItemId) {
+        setError("Failed to get content item ID from draft save");
+        return;
+      }
+
+      // Step 2: Call publish endpoint
+      const allMediaIds = mediaAssetIds.flat();
+      const threadTexts = threadMode ? posts.slice(1).map((t) => t.body) : undefined;
+      const threadMediaIds = threadMode
+        ? posts.slice(1).map((t) => t.media.filter((m) => m.assetId).map((m) => m.assetId!))
+        : undefined;
+
+      const publishRes = await fetch("/api/content/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentItemId,
+          platform,
+          mode: publishMode,
+          text: posts[0].body,
+          mediaAssetIds: allMediaIds.length > 0 ? allMediaIds : undefined,
+          threadTexts: threadTexts?.length ? threadTexts : undefined,
+          threadMediaIds: threadMediaIds?.some((t) => t.length > 0) ? threadMediaIds : undefined,
+        }),
+      });
+
+      const publishData = await publishRes.json();
+
+      if (publishData.success) {
+        if (publishData.platformUrl) {
+          setPublishResult({ url: publishData.platformUrl });
+          setPublishProgress(null);
+        } else {
+          onOpenChange(false);
+          onSuccess?.();
+        }
+      } else {
+        setError(publishData.error || "Browser publish failed");
+      }
+    } catch {
+      setError("Browser publish failed");
+    } finally {
+      setPublishing(false);
+      if (!publishResult) {
+        setPublishProgress(null);
+      }
     }
   }
 
@@ -438,8 +538,8 @@ export function ComposeDialog({
           </div>
         ) : (
           <div className="space-y-3">
-            {/* Platform toggle */}
-            <div className="flex items-center gap-2">
+            {/* Platform toggle + Publish mode + Thread toggle */}
+            <div className="flex items-center gap-2 flex-wrap">
               <div className="flex items-center rounded-lg border p-0.5">
                 <Button
                   variant={platform === "x" ? "default" : "ghost"}
@@ -458,6 +558,44 @@ export function ComposeDialog({
                   LinkedIn
                 </Button>
               </div>
+
+              {/* Publish mode toggle */}
+              <TooltipProvider>
+                <div className="flex items-center rounded-lg border p-0.5">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={publishMode === "auto" ? "default" : "ghost"}
+                        size="sm"
+                        className="h-7 text-xs px-2.5"
+                        onClick={() => setPublishMode("auto")}
+                      >
+                        <Globe className="mr-1 h-3 w-3" />
+                        Auto
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p className="text-xs">Headless browser publishes automatically</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant={publishMode === "review" ? "default" : "ghost"}
+                        size="sm"
+                        className="h-7 text-xs px-2.5"
+                        onClick={() => setPublishMode("review")}
+                      >
+                        <Eye className="mr-1 h-3 w-3" />
+                        Review
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p className="text-xs">Opens browser for you to review and click Post</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+              </TooltipProvider>
 
               {/* Thread / Single toggle — only for platforms that support it */}
               {config.threadSupport && (
@@ -553,30 +691,65 @@ export function ComposeDialog({
                 {publishProgress}
               </div>
             )}
+
+            {/* Publish success with link */}
+            {publishResult?.url && (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+                <div className="flex items-center gap-2">
+                  Published successfully!
+                  <a
+                    href={publishResult.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 underline"
+                  >
+                    View post <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={() => onOpenChange(false)}
+            onClick={() => {
+              setPublishResult(null);
+              onOpenChange(false);
+            }}
             disabled={publishing || saving}
           >
-            Cancel
+            {publishResult ? "Close" : "Cancel"}
           </Button>
-          <Button
-            variant="secondary"
-            onClick={handleSaveDraft}
-            disabled={!canSaveDraft}
-          >
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save Draft
-          </Button>
-          {platform === "x" && (
-            <Button onClick={handlePublish} disabled={!canPublish}>
-              {publishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {threadMode ? `Publish Thread (${posts.length})` : "Publish"}
-            </Button>
+          {!publishResult && (
+            <>
+              <Button
+                variant="secondary"
+                onClick={handleSaveDraft}
+                disabled={!canSaveDraft}
+              >
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Draft
+              </Button>
+              {/* X API publish (X only, original path) */}
+              {platform === "x" && (
+                <Button
+                  variant="outline"
+                  onClick={handleApiPublish}
+                  disabled={!canPublish}
+                >
+                  {publishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {threadMode ? `API Publish (${posts.length})` : "API Publish"}
+                </Button>
+              )}
+              {/* Browser publish (both platforms) */}
+              <Button onClick={handleBrowserPublish} disabled={!canPublish}>
+                {publishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Globe className="mr-1.5 h-3.5 w-3.5" />
+                {threadMode ? `Publish (${posts.length})` : "Publish"}
+              </Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>

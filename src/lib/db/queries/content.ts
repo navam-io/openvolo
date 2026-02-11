@@ -215,6 +215,15 @@ export function getThreadItems(threadId: string): ContentItemWithPost[] {
   return attachPostsAndMetrics(rows);
 }
 
+/** Create a standalone content post record (when the content item already exists). */
+export function createContentPost(
+  data: Omit<NewContentPost, "id">
+): ContentPost {
+  const id = nanoid();
+  db.insert(contentPosts).values({ ...data, id }).run();
+  return db.select().from(contentPosts).where(eq(contentPosts.id, id)).get()!;
+}
+
 /** Upsert an engagement metrics snapshot for a content post. */
 export function upsertEngagementMetrics(
   contentPostId: string,

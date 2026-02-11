@@ -17,6 +17,7 @@ import { enrichContact } from "@/lib/agents/tools/enrich-contact";
 import { archiveContactTool } from "@/lib/agents/tools/archive-contact";
 import { engagePost } from "@/lib/agents/tools/engage-post";
 import { saveDraft } from "@/lib/agents/tools/save-draft";
+import { publishContent } from "@/lib/agents/tools/publish-content";
 import { updateProgress } from "@/lib/agents/tools/update-progress";
 import { routeUrl, shouldEscalateToBrowser } from "@/lib/agents/router";
 import type { AgentRunConfig } from "@/lib/agents/types";
@@ -70,6 +71,7 @@ You are running as an AUTONOMOUS background agent. There is NO human in the loop
 - **archive_contact**: Archive a contact with a reason (used during prune workflows)
 - **engage_post**: Engage with a post on X or LinkedIn (like, reply, or retweet) via browser automation
 - **save_draft**: Save a content draft (post, article, thread, etc.) to the CRM content library
+- **publish_content**: Publish a post to X or LinkedIn via browser automation (auto mode, returns published URL)
 - **report_progress**: Report progress during execution
 
 ## Guidelines
@@ -495,6 +497,20 @@ export async function runAgentWorkflow(
           },
         }),
 
+        publish_content: tool({
+          description:
+            "Publish content to X or LinkedIn via browser automation. Returns the published post URL. Requires a browser session to be set up.",
+          inputSchema: z.object({
+            platform: z.enum(["x", "linkedin"]).describe("Target platform"),
+            text: z.string().describe("The post content text"),
+            mediaAssetIds: z.array(z.string()).optional().describe("Media asset IDs to attach"),
+            threadTexts: z.array(z.string()).optional().describe("Additional thread texts (X only)"),
+          }),
+          execute: async ({ platform, text, mediaAssetIds, threadTexts }) => {
+            return publishContent({ platform, text, mediaAssetIds, threadTexts }, runId);
+          },
+        }),
+
         report_progress: tool({
           description:
             "Report your current progress. Use this after completing major steps to keep the user informed.",
@@ -873,6 +889,20 @@ async function executeAgentLoop(
           }),
           execute: async (params) => {
             return saveDraft(params, runId);
+          },
+        }),
+
+        publish_content: tool({
+          description:
+            "Publish content to X or LinkedIn via browser automation (auto mode, returns published URL).",
+          inputSchema: z.object({
+            platform: z.enum(["x", "linkedin"]).describe("Target platform"),
+            text: z.string().describe("The post content text"),
+            mediaAssetIds: z.array(z.string()).optional().describe("Media asset IDs to attach"),
+            threadTexts: z.array(z.string()).optional().describe("Additional thread texts (X only)"),
+          }),
+          execute: async ({ platform, text, mediaAssetIds, threadTexts }) => {
+            return publishContent({ platform, text, mediaAssetIds, threadTexts }, runId);
           },
         }),
 

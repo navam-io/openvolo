@@ -43,6 +43,7 @@ export function buildChatSystemPrompt(pageContext?: PageContext): string {
   parts.push("- **create_contact**: Create a new contact record");
   parts.push("- **create_task**: Create a follow-up task for a contact");
   parts.push("- **start_workflow**: Trigger an agent from a template");
+  parts.push("- **publish_content**: Publish a post to X or LinkedIn via browser automation");
 
   return parts.join("\n");
 }
