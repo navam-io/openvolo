@@ -5,6 +5,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { X, ArrowUp, ArrowDown } from "lucide-react";
+import { MediaDropzone } from "@/components/media-dropzone";
+import { MediaThumbnailGrid } from "@/components/media-thumbnail-grid";
+import type { MediaThumbnailItem } from "@/components/media-thumbnail-grid";
+import { PLATFORM_MEDIA_CONSTRAINTS, isVideoType } from "@/lib/media/constraints";
 
 interface PostInputProps {
   value: string;
@@ -18,6 +22,10 @@ interface PostInputProps {
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   autoFocus?: boolean;
+  media?: MediaThumbnailItem[];
+  onAddMedia?: (files: File[]) => void;
+  onRemoveMedia?: (id: string) => void;
+  platform?: "x" | "linkedin";
 }
 
 export function PostInput({
@@ -32,6 +40,10 @@ export function PostInput({
   onMoveUp,
   onMoveDown,
   autoFocus,
+  media,
+  onAddMedia,
+  onRemoveMedia,
+  platform,
 }: PostInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const length = value.length;
@@ -124,6 +136,35 @@ export function PostInput({
       >
         {length}/{maxChars}
       </span>
+
+      {/* Media attachments */}
+      {media && media.length > 0 && onRemoveMedia && (
+        <div className="mt-2">
+          <MediaThumbnailGrid media={media} onRemove={onRemoveMedia} />
+        </div>
+      )}
+
+      {/* Media dropzone */}
+      {platform && onAddMedia && (
+        <div className="mt-2">
+          <MediaDropzone
+            platform={platform}
+            currentCount={media?.length ?? 0}
+            maxSlots={computeMaxSlots(platform, media ?? [])}
+            onFilesSelected={onAddMedia}
+          />
+        </div>
+      )}
     </div>
   );
+}
+
+function computeMaxSlots(
+  platform: "x" | "linkedin",
+  media: MediaThumbnailItem[],
+): number {
+  const constraints = PLATFORM_MEDIA_CONSTRAINTS[platform];
+  const hasVideo = media.some((m) => isVideoType(m.mimeType));
+  if (hasVideo) return 1; // only 1 video allowed
+  return constraints.maxImages;
 }

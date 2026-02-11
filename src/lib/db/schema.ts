@@ -190,6 +190,23 @@ export const contentItems = sqliteTable("content_items", {
   index("idx_content_items_account").on(table.platformAccountId),
 ]);
 
+// --- Media Assets ---
+
+export const mediaAssets = sqliteTable("media_assets", {
+  id: text("id").primaryKey(),
+  filename: text("filename").notNull(),
+  storagePath: text("storage_path").notNull(), // relative: "{nanoid}.{ext}"
+  mimeType: text("mime_type").notNull(),
+  fileSize: integer("file_size").notNull(), // bytes
+  width: integer("width"), // images only
+  height: integer("height"), // images only
+  contentItemId: text("content_item_id").references(() => contentItems.id, { onDelete: "set null" }),
+  platformTarget: text("platform_target", { enum: ["x", "linkedin"] }),
+  ...timestamps,
+}, (table) => [
+  index("idx_media_assets_content_item").on(table.contentItemId),
+]);
+
 // --- Content Posts (published instances) ---
 
 export const contentPosts = sqliteTable("content_posts", {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { nanoid } from "nanoid";
 import {
   Dialog,
@@ -14,12 +14,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PostInput } from "@/components/post-input";
 import { Loader2, Plus, ListOrdered, AlignLeft } from "lucide-react";
+import type { MediaThumbnailItem } from "@/components/media-thumbnail-grid";
+import { validateMediaFile, validateMediaSet } from "@/lib/media/constraints";
 
 type Platform = "x" | "linkedin";
+
+interface MediaAttachment extends MediaThumbnailItem {
+  assetId?: string; // DB ID after upload completes
+  fileSize: number;
+}
 
 interface PostItem {
   id: string;
   body: string;
+  media: MediaAttachment[];
 }
 
 interface ComposeDialogProps {
@@ -59,7 +67,7 @@ export function ComposeDialog({
 }: ComposeDialogProps) {
   const [platform, setPlatform] = useState<Platform>("x");
   const [posts, setPosts] = useState<PostItem[]>([
-    { id: nanoid(), body: "" },
+    { id: nanoid(), body: "", media: [] },
   ]);
   const [threadMode, setThreadMode] = useState(false);
   const [publishing, setPublishing] = useState(false);
@@ -67,6 +75,7 @@ export function ComposeDialog({
   const [error, setError] = useState<string | null>(null);
   const [publishProgress, setPublishProgress] = useState<string | null>(null);
   const [loadingDraft, setLoadingDraft] = useState(false);
+  const blobUrlsRef = useRef<string[]>([]);
 
   const config = PLATFORM_CONFIG[platform];
 
@@ -75,7 +84,7 @@ export function ComposeDialog({
     if (!open) return;
     if (!draftId) {
       // Reset state for new compose
-      setPosts([{ id: nanoid(), body: "" }]);
+      setPosts([{ id: nanoid(), body: "", media: [] }]);
       setThreadMode(false);
       setError(null);
       setPublishProgress(null);
@@ -112,16 +121,17 @@ export function ComposeDialog({
                 (ti: any) => ({
                   id: ti.id,
                   body: ti.body || "",
+                  media: [],
                 })
               );
               if (items.length > 1) {
                 setThreadMode(true);
               }
-              setPosts(items.length > 0 ? items : [{ id: nanoid(), body: item.body || "" }]);
+              setPosts(items.length > 0 ? items : [{ id: nanoid(), body: item.body || "", media: [] }]);
             });
         }
 
-        setPosts([{ id: item.id, body: item.body || "" }]);
+        setPosts([{ id: item.id, body: item.body || "", media: [] }]);
         setThreadMode(false);
       })
       .catch(() => setError("Failed to load draft"))
@@ -135,7 +145,7 @@ export function ComposeDialog({
   }, []);
 
   const addPost = useCallback(() => {
-    setPosts((prev) => [...prev, { id: nanoid(), body: "" }]);
+    setPosts((prev) => [...prev, { id: nanoid(), body: "", media: [] }]);
   }, []);
 
   const removePost = useCallback((index: number) => {
@@ -156,7 +166,7 @@ export function ComposeDialog({
       if (!prev) {
         // Switching to thread mode: if only 1 post, add a second
         setPosts((t) =>
-          t.length === 1 ? [...t, { id: nanoid(), body: "" }] : t
+          t.length === 1 ? [...t, { id: nanoid(), body: "", media: [] }] : t
         );
       } else {
         // Switching to single mode: keep only first post
@@ -175,10 +185,154 @@ export function ComposeDialog({
     }
   }, [threadMode]);
 
+  // --- Media handlers ---
+
+  const handleAddMedia = useCallback(
+    (postIndex: number, files: File[]) => {
+      setError(null);
+
+      for (const file of files) {
+        const err = validateMediaFile(
+          { name: file.name, type: file.type, size: file.size },
+          platform,
+        );
+        if (err) {
+          setError(err);
+          return;
+        }
+      }
+
+      // Check set validation with current + new
+      const currentMedia = posts[postIndex]?.media ?? [];
+      const newMediaTypes = files.map((f) => ({ mimeType: f.type }));
+      const setError2 = validateMediaSet(
+        [...currentMedia, ...newMediaTypes],
+        platform,
+      );
+      if (setError2) {
+        setError(setError2);
+        return;
+      }
+
+      // Create blob URLs and upload
+      const newAttachments: MediaAttachment[] = files.map((file) => {
+        const previewUrl = URL.createObjectURL(file);
+        blobUrlsRef.current.push(previewUrl);
+        return {
+          id: nanoid(),
+          previewUrl,
+          filename: file.name,
+          mimeType: file.type,
+          fileSize: file.size,
+          uploading: true,
+        };
+      });
+
+      // Add to state immediately (optimistic)
+      setPosts((prev) =>
+        prev.map((p, i) =>
+          i === postIndex ? { ...p, media: [...p.media, ...newAttachments] } : p
+        ),
+      );
+
+      // Upload each file
+      newAttachments.forEach((attachment, idx) => {
+        const file = files[idx];
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("platformTarget", platform);
+
+        fetch("/api/media", { method: "POST", body: formData })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.error) {
+              setError(data.error);
+              // Remove failed upload from state
+              setPosts((prev) =>
+                prev.map((p, i) =>
+                  i === postIndex
+                    ? { ...p, media: p.media.filter((m) => m.id !== attachment.id) }
+                    : p
+                ),
+              );
+              return;
+            }
+            // Mark upload complete with server ID
+            setPosts((prev) =>
+              prev.map((p, i) =>
+                i === postIndex
+                  ? {
+                      ...p,
+                      media: p.media.map((m) =>
+                        m.id === attachment.id
+                          ? { ...m, uploading: false, assetId: data.id }
+                          : m
+                      ),
+                    }
+                  : p
+              ),
+            );
+          })
+          .catch(() => {
+            setError(`Failed to upload ${file.name}`);
+            setPosts((prev) =>
+              prev.map((p, i) =>
+                i === postIndex
+                  ? { ...p, media: p.media.filter((m) => m.id !== attachment.id) }
+                  : p
+              ),
+            );
+          });
+      });
+    },
+    [platform, posts],
+  );
+
+  const handleRemoveMedia = useCallback(
+    (postIndex: number, mediaId: string) => {
+      const post = posts[postIndex];
+      const attachment = post?.media.find((m) => m.id === mediaId);
+      if (!attachment) return;
+
+      // Revoke blob URL
+      URL.revokeObjectURL(attachment.previewUrl);
+      blobUrlsRef.current = blobUrlsRef.current.filter(
+        (u) => u !== attachment.previewUrl,
+      );
+
+      // Remove from state
+      setPosts((prev) =>
+        prev.map((p, i) =>
+          i === postIndex
+            ? { ...p, media: p.media.filter((m) => m.id !== mediaId) }
+            : p
+        ),
+      );
+
+      // Delete from server if uploaded
+      if (attachment.assetId) {
+        fetch(`/api/media/${attachment.assetId}`, { method: "DELETE" }).catch(
+          () => {},
+        );
+      }
+    },
+    [posts],
+  );
+
+  // Cleanup blob URLs on dialog close
+  useEffect(() => {
+    if (!open) {
+      blobUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      blobUrlsRef.current = [];
+    }
+  }, [open]);
+
   const hasContent = posts.some((t) => t.body.trim().length > 0);
+  const hasMedia = posts.some((t) => t.media.length > 0);
   const hasOverflow = posts.some((t) => t.body.length > config.maxChars);
-  const canPublish = hasContent && !hasOverflow && !publishing && !saving && platform === "x";
-  const canSaveDraft = hasContent && !publishing && !saving;
+  const isUploading = posts.some((t) => t.media.some((m) => m.uploading));
+  const canPublish = (hasContent || hasMedia) && !hasOverflow && !publishing && !saving && !isUploading && platform === "x";
+  const canSaveDraft = (hasContent || hasMedia) && !publishing && !saving && !isUploading;
 
   async function handlePublish() {
     if (!canPublish) return;
@@ -225,6 +379,11 @@ export function ComposeDialog({
     setError(null);
 
     try {
+      // Collect media asset IDs per post
+      const mediaAssetIds = posts.map((t) =>
+        t.media.filter((m) => m.assetId).map((m) => m.assetId!)
+      );
+
       const res = await fetch(`/api/platforms/${platform}/compose`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -233,6 +392,7 @@ export function ComposeDialog({
           saveAsDraft: true,
           draftId: draftId || undefined,
           platformTarget: platform,
+          mediaAssetIds,
         }),
       });
 
@@ -253,7 +413,7 @@ export function ComposeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {platform === "linkedin" ? "Compose LinkedIn Post" : "Compose Post"}
@@ -341,6 +501,10 @@ export function ComposeDialog({
                       i < posts.length - 1 ? () => movePost(i, i + 1) : undefined
                     }
                     autoFocus={i === posts.length - 1 && posts.length > 1}
+                    media={post.media}
+                    onAddMedia={(files) => handleAddMedia(i, files)}
+                    onRemoveMedia={(id) => handleRemoveMedia(i, id)}
+                    platform={platform}
                   />
                 ))}
 
@@ -368,6 +532,10 @@ export function ComposeDialog({
                 maxChars={config.maxChars}
                 placeholder={config.placeholder}
                 autoFocus
+                media={posts[0].media}
+                onAddMedia={(files) => handleAddMedia(0, files)}
+                onRemoveMedia={(id) => handleRemoveMedia(0, id)}
+                platform={platform}
               />
             )}
 

@@ -22,6 +22,13 @@
       "when": 1770691917869,
       "tag": "0002_sharp_jackpot",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1770777795407,
+      "tag": "0003_high_adam_warlock",
+      "breakpoints": true
     }
   ]
 }

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { nanoid } from "nanoid";
 import { getPlatformAccountByPlatform } from "@/lib/db/queries/platform-accounts";
 import { createContentItem, updateContentItem, getContentItem, getThreadItems } from "@/lib/db/queries/content";
+import { linkMediaToContent } from "@/lib/db/queries/media";
 import {
   getAuthenticatedUser,
   postTweet,
@@ -15,6 +16,7 @@ const composeSchema = z.object({
   tweets: z.array(z.string().min(1).max(280)).min(1).max(25),
   saveAsDraft: z.boolean().optional(),
   draftId: z.string().optional(),
+  mediaAssetIds: z.array(z.array(z.string())).optional(),
 });
 
 /**
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { tweets, saveAsDraft, draftId } = composeSchema.parse(body);
+    const { tweets, saveAsDraft, draftId, mediaAssetIds } = composeSchema.parse(body);
 
     const isThread = tweets.length > 1;
     const threadId = draftId
@@ -43,6 +45,15 @@ export async function POST(req: NextRequest) {
     // --- Save as draft ---
     if (saveAsDraft) {
       const items = saveDraftItems(tweets, threadId, draftId, account.id);
+      // Link media assets to content items
+      if (mediaAssetIds) {
+        items.forEach((item, i) => {
+          const assetIds = mediaAssetIds[i] ?? [];
+          for (const assetId of assetIds) {
+            linkMediaToContent(assetId, item.id);
+          }
+        });
+      }
       return NextResponse.json({ success: true, draft: true, items });
     }
 

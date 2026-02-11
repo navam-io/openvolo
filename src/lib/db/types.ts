@@ -16,6 +16,7 @@ import {
   workflowRuns,
   workflowSteps,
   scheduledJobs,
+  mediaAssets,
 } from "./schema";
 
 // Contact types
@@ -81,6 +82,10 @@ export type WorkflowRunWithSteps = WorkflowRun & { steps: WorkflowStep[] };
 // Scheduled job types
 export type ScheduledJob = InferSelectModel<typeof scheduledJobs>;
 export type NewScheduledJob = InferInsertModel<typeof scheduledJobs>;
+
+// Media asset types
+export type MediaAsset = InferSelectModel<typeof mediaAssets>;
+export type NewMediaAsset = InferInsertModel<typeof mediaAssets>;
 
 export interface PaginatedResult<T> {
   data: T[];
