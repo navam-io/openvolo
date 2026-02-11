@@ -17,6 +17,8 @@ import {
   Hash,
   ClipboardList,
   Eye,
+  Target,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import type { PageContext } from "@/lib/chat/types";
@@ -69,6 +71,16 @@ const PAGE_PROMPTS: Record<string, PromptTuple[]> = {
     ["How are my workflows performing?", Activity],
     ["Which contacts have the highest engagement?", TrendingUp],
   ],
+  "/dashboard/goals": [
+    ["Show my active goals", Target],
+    ["Which goals are behind schedule?", AlertCircle],
+    ["What workflows contribute to my goals?", Zap],
+  ],
+  "/dashboard/goals/[id]": [
+    ["How is this goal progressing?", TrendingUp],
+    ["Which workflows are linked to this goal?", Zap],
+    ["Is this goal on track to meet the deadline?", Target],
+  ],
   "/dashboard/settings": [
     ["What platforms are connected?", Settings],
     ["Show me my CRM statistics", Database],
@@ -92,6 +104,8 @@ export function getSmartPrompts(ctx: PageContext): SmartPrompt[] {
     key = "/dashboard/workflows/[id]";
   } else if (ctx.contentId) {
     key = "/dashboard/content/[id]";
+  } else if (ctx.goalId) {
+    key = "/dashboard/goals/[id]";
   } else {
     // Try exact path match, fall back to default
     key = PAGE_PROMPTS[ctx.path] ? ctx.path : DEFAULT_KEY;

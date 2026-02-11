@@ -472,3 +472,59 @@ export const scheduledJobs = sqliteTable("scheduled_jobs", {
     .notNull()
     .default(sql`(unixepoch())`),
 });
+
+// --- Goals (demand generation tracking) ---
+
+export const goals = sqliteTable("goals", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  goalType: text("goal_type", {
+    enum: ["audience_growth", "lead_generation", "content_engagement", "pipeline_progression"],
+  }).notNull(),
+  platform: text("platform", { enum: ["x", "linkedin"] }), // nullable — null = cross-platform
+  targetValue: integer("target_value").notNull(),
+  currentValue: integer("current_value").notNull().default(0),
+  unit: text("unit").notNull(), // e.g. "contacts", "followers", "engagements", "leads"
+  deadline: integer("deadline"), // nullable unix timestamp
+  status: text("status", {
+    enum: ["active", "achieved", "missed", "paused"],
+  })
+    .notNull()
+    .default("active"),
+  ...timestamps,
+});
+
+// --- Goal ↔ Workflow Template junction ---
+
+export const goalWorkflows = sqliteTable("goal_workflows", {
+  id: text("id").primaryKey(),
+  goalId: text("goal_id")
+    .notNull()
+    .references(() => goals.id, { onDelete: "cascade" }),
+  templateId: text("template_id")
+    .notNull()
+    .references(() => workflowTemplates.id, { onDelete: "cascade" }),
+  contribution: text("contribution", { enum: ["primary", "supporting"] })
+    .notNull()
+    .default("primary"),
+  ...timestamps,
+});
+
+// --- Goal Progress (time-series snapshots) ---
+
+export const goalProgress = sqliteTable("goal_progress", {
+  id: text("id").primaryKey(),
+  goalId: text("goal_id")
+    .notNull()
+    .references(() => goals.id, { onDelete: "cascade" }),
+  value: integer("value").notNull(), // absolute value at snapshot time
+  delta: integer("delta").notNull(), // change from previous
+  source: text("source"), // workflow run ID, "manual", or "system"
+  note: text("note"), // descriptive text
+  snapshotAt: integer("snapshot_at")
+    .notNull()
+    .default(sql`(unixepoch())`),
+}, (table) => [
+  index("idx_goal_progress_goal").on(table.goalId),
+  index("idx_goal_progress_snapshot").on(table.snapshotAt),
+]);

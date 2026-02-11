@@ -5,6 +5,7 @@ import { getDashboardMetrics } from "@/lib/db/queries/dashboard";
 import { listWorkflowRuns } from "@/lib/db/queries/workflows";
 import { listTemplates } from "@/lib/db/queries/workflow-templates";
 import { listContentItems } from "@/lib/db/queries/content";
+import { listGoals } from "@/lib/db/queries/goals";
 import { createTask } from "@/lib/db/queries/tasks";
 import { startAgentWorkflow } from "@/lib/agents/run-agent-workflow";
 import type { WorkflowType } from "@/lib/workflows/types";
@@ -302,6 +303,42 @@ export const chatTools = {
         status: run.status,
         workflowType: run.workflowType,
         message: `Workflow started. Run ID: ${run.id}`,
+      };
+    },
+  }),
+
+  query_goals: tool({
+    description:
+      "List and filter goals by status or type. Returns up to 20 goals with progress.",
+    inputSchema: z.object({
+      status: z
+        .enum(["active", "achieved", "missed", "paused"])
+        .optional()
+        .describe("Filter by goal status"),
+      goalType: z
+        .enum(["audience_growth", "lead_generation", "content_engagement", "pipeline_progression"])
+        .optional()
+        .describe("Filter by goal type"),
+    }),
+    execute: async ({ status, goalType }) => {
+      const result = listGoals({
+        status,
+        goalType,
+        pageSize: MAX_RESULTS,
+      });
+
+      return {
+        total: result.total,
+        goals: result.data.map((g) => ({
+          id: g.id,
+          name: g.name,
+          goalType: g.goalType,
+          targetValue: g.targetValue,
+          currentValue: g.currentValue,
+          unit: g.unit,
+          status: g.status,
+          deadline: g.deadline,
+        })),
       };
     },
   }),

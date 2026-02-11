@@ -20,6 +20,7 @@ import { saveDraft } from "@/lib/agents/tools/save-draft";
 import { publishContent } from "@/lib/agents/tools/publish-content";
 import { updateProgress } from "@/lib/agents/tools/update-progress";
 import { routeUrl, shouldEscalateToBrowser } from "@/lib/agents/router";
+import { updateGoalProgressFromWorkflow } from "@/lib/db/queries/goals";
 import type { AgentRunConfig } from "@/lib/agents/types";
 import type { WorkflowRun } from "@/lib/db/types";
 import type { WorkflowType } from "@/lib/workflows/types";
@@ -597,6 +598,15 @@ export async function runAgentWorkflow(
       });
     }
 
+    // Auto-update goal progress from workflow completion
+    if (config.templateId) {
+      try {
+        updateGoalProgressFromWorkflow(config.templateId, runId, config.workflowType, resultData);
+      } catch {
+        // Goal progress tracking is non-critical — don't fail the run
+      }
+    }
+
     return finalRun ?? run;
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);
@@ -963,6 +973,15 @@ async function executeAgentLoop(
         totalRuns: (template.totalRuns ?? 0) + 1,
         lastRunAt: Math.floor(Date.now() / 1000),
       });
+    }
+
+    // Auto-update goal progress from workflow completion
+    if (config.templateId) {
+      try {
+        updateGoalProgressFromWorkflow(config.templateId, runId, config.workflowType, resultData);
+      } catch {
+        // Goal progress tracking is non-critical — don't fail the run
+      }
     }
   } catch (err) {
     const errorMessage = err instanceof Error ? err.message : String(err);

@@ -17,6 +17,9 @@ import {
   workflowSteps,
   scheduledJobs,
   mediaAssets,
+  goals,
+  goalWorkflows,
+  goalProgress,
 } from "./schema";
 
 // Contact types
@@ -86,6 +89,14 @@ export type NewScheduledJob = InferInsertModel<typeof scheduledJobs>;
 // Media asset types
 export type MediaAsset = InferSelectModel<typeof mediaAssets>;
 export type NewMediaAsset = InferInsertModel<typeof mediaAssets>;
+
+// Goal types
+export type Goal = InferSelectModel<typeof goals>;
+export type NewGoal = InferInsertModel<typeof goals>;
+export type GoalWorkflow = InferSelectModel<typeof goalWorkflows>;
+export type NewGoalWorkflow = InferInsertModel<typeof goalWorkflows>;
+export type GoalProgress = InferSelectModel<typeof goalProgress>;
+export type NewGoalProgress = InferInsertModel<typeof goalProgress>;
 
 export interface PaginatedResult<T> {
   data: T[];

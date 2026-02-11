@@ -6,6 +6,7 @@ import {
   FileText,
   Zap,
   BarChart3,
+  Target,
   Settings,
   HelpCircle,
 } from "lucide-react";
@@ -32,6 +33,7 @@ const navItems = [
   { title: "Content", href: "/dashboard/content", icon: FileText },
   { title: "Automation", href: "/dashboard/workflows", icon: Zap },
   { title: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
+  { title: "Goals", href: "/dashboard/goals", icon: Target },
 ];
 
 export function AppSidebar() {

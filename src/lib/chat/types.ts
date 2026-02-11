@@ -4,4 +4,5 @@ export interface PageContext {
   contactId?: string;
   workflowId?: string;
   contentId?: string;
+  goalId?: string;
 }
