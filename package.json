@@ -1,6 +1,6 @@
 {
   "name": "openvolo",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Agentic AI-Native Social CRM — manage X/Twitter and LinkedIn with Claude-powered agents",
   "type": "module",
   "bin": {
