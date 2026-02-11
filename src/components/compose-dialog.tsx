@@ -88,6 +88,29 @@ export function ComposeDialog({
 
   const config = PLATFORM_CONFIG[platform];
 
+  // Hydrate media attachments from mediaPaths JSON array
+  const hydrateMedia = useCallback(
+    async (contentItemId: string): Promise<MediaAttachment[]> => {
+      try {
+        const res = await fetch(`/api/media?contentItemId=${contentItemId}`);
+        const data = await res.json();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (data.assets || []).map((a: any) => ({
+          id: a.id,
+          previewUrl: `/api/media/${a.id}`,
+          filename: a.filename,
+          mimeType: a.mimeType,
+          fileSize: a.fileSize,
+          assetId: a.id,
+          uploading: false,
+        }));
+      } catch {
+        return [];
+      }
+    },
+    [],
+  );
+
   // Load draft content when draftId changes
   useEffect(() => {
     if (!open) return;
@@ -106,7 +129,7 @@ export function ComposeDialog({
 
     fetch(`/api/content/${draftId}`)
       .then((res) => res.json())
-      .then((data) => {
+      .then(async (data) => {
         if (data.error) {
           setError(data.error);
           return;
@@ -121,32 +144,34 @@ export function ComposeDialog({
           setPlatform("x");
         }
 
+        // Hydrate media for the primary content item
+        const media = await hydrateMedia(item.id);
+
         // If it has a threadId, fetch thread items
         if (item.threadId) {
-          return fetch(`/api/content?threadId=${item.threadId}&status=draft`)
-            .then((res) => res.json())
-            .then((threadData) => {
-              const items: PostItem[] = (threadData.items || []).map(
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (ti: any) => ({
-                  id: ti.id,
-                  body: ti.body || "",
-                  media: [],
-                })
-              );
-              if (items.length > 1) {
-                setThreadMode(true);
-              }
-              setPosts(items.length > 0 ? items : [{ id: nanoid(), body: item.body || "", media: [] }]);
-            });
+          const threadRes = await fetch(`/api/content?threadId=${item.threadId}&status=draft`);
+          const threadData = await threadRes.json();
+          const items: PostItem[] = await Promise.all(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (threadData.items || []).map(async (ti: any) => ({
+              id: ti.id,
+              body: ti.body || "",
+              media: await hydrateMedia(ti.id),
+            }))
+          );
+          if (items.length > 1) {
+            setThreadMode(true);
+          }
+          setPosts(items.length > 0 ? items : [{ id: nanoid(), body: item.body || "", media }]);
+          return;
         }
 
-        setPosts([{ id: item.id, body: item.body || "", media: [] }]);
+        setPosts([{ id: item.id, body: item.body || "", media }]);
         setThreadMode(false);
       })
       .catch(() => setError("Failed to load draft"))
       .finally(() => setLoadingDraft(false));
-  }, [draftId, open]);
+  }, [draftId, open, hydrateMedia]);
 
   const updatePost = useCallback((index: number, value: string) => {
     setPosts((prev) =>
