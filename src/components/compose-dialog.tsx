@@ -19,9 +19,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Loader2, Plus, ListOrdered, AlignLeft, Globe, Eye, ExternalLink } from "lucide-react";
+import { Loader2, Plus, ListOrdered, AlignLeft, Globe, Eye, ExternalLink, Sparkles, ArrowRightLeft } from "lucide-react";
 import type { MediaThumbnailItem } from "@/components/media-thumbnail-grid";
 import { validateMediaFile, validateMediaSet } from "@/lib/media/constraints";
+import { AiAssistPanel } from "@/app/dashboard/content/ai-assist-panel";
+import { cn } from "@/lib/utils";
 
 type Platform = "x" | "linkedin";
 type PublishMode = "auto" | "review";
@@ -84,6 +86,8 @@ export function ComposeDialog({
   const [publishResult, setPublishResult] = useState<{ url?: string } | null>(null);
   const [loadingDraft, setLoadingDraft] = useState(false);
   const [publishMode, setPublishMode] = useState<PublishMode>("auto");
+  const [aiPanelOpen, setAiPanelOpen] = useState(false);
+  const [adapting, setAdapting] = useState(false);
   const blobUrlsRef = useRef<string[]>([]);
 
   const config = PLATFORM_CONFIG[platform];
@@ -538,7 +542,7 @@ export function ComposeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className={cn("max-h-[85vh] overflow-y-auto", aiPanelOpen ? "sm:max-w-5xl" : "sm:max-w-2xl")}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {platform === "linkedin" ? "Compose LinkedIn Post" : "Compose Post"}
@@ -643,96 +647,188 @@ export function ComposeDialog({
                   )}
                 </Button>
               )}
+
+              <div className="flex-1" />
+
+              {/* Adapt for other platform */}
+              {posts[0].body.trim().length > 0 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        disabled={adapting}
+                        onClick={async () => {
+                          setAdapting(true);
+                          setError(null);
+                          const targetPlatform = platform === "x" ? "linkedin" : "x";
+                          try {
+                            const res = await fetch("/api/content/ai-generate", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                mode: "refine",
+                                platform: targetPlatform,
+                                existingContent: posts[0].body,
+                                topic: `Adapt this ${platform === "x" ? "X/Twitter" : "LinkedIn"} post for ${targetPlatform === "x" ? "X/Twitter (280 chars max, concise)" : "LinkedIn (professional, expanded)"}. Preserve the core message.`,
+                              }),
+                            });
+                            const data = await res.json();
+                            if (res.ok && data.result) {
+                              handlePlatformSwitch(targetPlatform);
+                              updatePost(0, data.result);
+                            } else {
+                              setError(data.error || "Adapt failed");
+                            }
+                          } catch {
+                            setError("Adapt failed");
+                          } finally {
+                            setAdapting(false);
+                          }
+                        }}
+                      >
+                        {adapting ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        ) : (
+                          <ArrowRightLeft className="mr-1 h-3 w-3" />
+                        )}
+                        Adapt for {platform === "x" ? "LinkedIn" : "X"}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p className="text-xs">AI adapts your content for {platform === "x" ? "LinkedIn" : "X"}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+
+              {/* AI Assist toggle */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant={aiPanelOpen ? "default" : "outline"}
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setAiPanelOpen((prev) => !prev)}
+                    >
+                      <Sparkles className="mr-1 h-3 w-3" />
+                      AI Assist
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">
+                    <p className="text-xs">Generate drafts, get ideas, or refine content with AI</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
 
-            {/* Post inputs */}
-            {threadMode && config.threadSupport && (
-              <div className="relative pl-3 border-l-2 border-muted space-y-3">
-                {posts.map((post, i) => (
+            {/* Compose area + AI panel row */}
+            <div className={cn("flex gap-0", aiPanelOpen && "gap-0")}>
+              {/* Left: compose area */}
+              <div className="flex-1 min-w-0 space-y-3">
+                {/* Post inputs */}
+                {threadMode && config.threadSupport && (
+                  <div className="relative pl-3 border-l-2 border-muted space-y-3">
+                    {posts.map((post, i) => (
+                      <PostInput
+                        key={post.id}
+                        value={post.body}
+                        onChange={(v) => updatePost(i, v)}
+                        index={i}
+                        total={posts.length}
+                        showNumber={true}
+                        maxChars={config.maxChars}
+                        placeholder={`Post ${i + 1}...`}
+                        onRemove={posts.length > 1 ? () => removePost(i) : undefined}
+                        onMoveUp={i > 0 ? () => movePost(i, i - 1) : undefined}
+                        onMoveDown={
+                          i < posts.length - 1 ? () => movePost(i, i + 1) : undefined
+                        }
+                        autoFocus={i === posts.length - 1 && posts.length > 1}
+                        media={post.media}
+                        onAddMedia={(files) => handleAddMedia(i, files)}
+                        onRemoveMedia={(id) => handleRemoveMedia(i, id)}
+                        platform={platform}
+                      />
+                    ))}
+
+                    {posts.length < MAX_THREAD_SIZE && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={addPost}
+                        className="text-muted-foreground"
+                      >
+                        <Plus className="mr-1.5 h-3.5 w-3.5" />
+                        Add post
+                      </Button>
+                    )}
+                  </div>
+                )}
+
+                {!threadMode && (
                   <PostInput
-                    key={post.id}
-                    value={post.body}
-                    onChange={(v) => updatePost(i, v)}
-                    index={i}
-                    total={posts.length}
-                    showNumber={true}
+                    value={posts[0].body}
+                    onChange={(v) => updatePost(0, v)}
+                    index={0}
+                    total={1}
+                    showNumber={false}
                     maxChars={config.maxChars}
-                    placeholder={`Post ${i + 1}...`}
-                    onRemove={posts.length > 1 ? () => removePost(i) : undefined}
-                    onMoveUp={i > 0 ? () => movePost(i, i - 1) : undefined}
-                    onMoveDown={
-                      i < posts.length - 1 ? () => movePost(i, i + 1) : undefined
-                    }
-                    autoFocus={i === posts.length - 1 && posts.length > 1}
-                    media={post.media}
-                    onAddMedia={(files) => handleAddMedia(i, files)}
-                    onRemoveMedia={(id) => handleRemoveMedia(i, id)}
+                    placeholder={config.placeholder}
+                    autoFocus
+                    media={posts[0].media}
+                    onAddMedia={(files) => handleAddMedia(0, files)}
+                    onRemoveMedia={(id) => handleRemoveMedia(0, id)}
                     platform={platform}
                   />
-                ))}
+                )}
 
-                {posts.length < MAX_THREAD_SIZE && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={addPost}
-                    className="text-muted-foreground"
-                  >
-                    <Plus className="mr-1.5 h-3.5 w-3.5" />
-                    Add post
-                  </Button>
+                {/* Error display */}
+                {error && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
+                    {error}
+                  </div>
+                )}
+
+                {/* Publish progress */}
+                {publishProgress && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {publishProgress}
+                  </div>
+                )}
+
+                {/* Publish success with link */}
+                {publishResult?.url && (
+                  <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
+                    <div className="flex items-center gap-2">
+                      Published successfully!
+                      <a
+                        href={publishResult.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 underline"
+                      >
+                        View post <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  </div>
                 )}
               </div>
-            )}
 
-            {!threadMode && (
-              <PostInput
-                value={posts[0].body}
-                onChange={(v) => updatePost(0, v)}
-                index={0}
-                total={1}
-                showNumber={false}
-                maxChars={config.maxChars}
-                placeholder={config.placeholder}
-                autoFocus
-                media={posts[0].media}
-                onAddMedia={(files) => handleAddMedia(0, files)}
-                onRemoveMedia={(id) => handleRemoveMedia(0, id)}
-                platform={platform}
-              />
-            )}
-
-            {/* Error display */}
-            {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200">
-                {error}
-              </div>
-            )}
-
-            {/* Publish progress */}
-            {publishProgress && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                {publishProgress}
-              </div>
-            )}
-
-            {/* Publish success with link */}
-            {publishResult?.url && (
-              <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800 dark:border-green-800 dark:bg-green-950 dark:text-green-200">
-                <div className="flex items-center gap-2">
-                  Published successfully!
-                  <a
-                    href={publishResult.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 underline"
-                  >
-                    View post <ExternalLink className="h-3 w-3" />
-                  </a>
-                </div>
-              </div>
-            )}
+              {/* Right: AI Assist panel */}
+              {aiPanelOpen && (
+                <AiAssistPanel
+                  platform={platform}
+                  currentContent={posts[0].body}
+                  onInsert={(text) => updatePost(0, text)}
+                  onClose={() => setAiPanelOpen(false)}
+                />
+              )}
+            </div>
           </div>
         )}
 
