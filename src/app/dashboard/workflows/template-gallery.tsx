@@ -195,7 +195,7 @@ export function TemplateGallery() {
             className="h-8"
             onClick={() => { setSection("system"); setFilter("all"); }}
           >
-            System Templates
+            System Agents
             <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">
               {systemTemplates.length}
             </Badge>
@@ -206,7 +206,7 @@ export function TemplateGallery() {
             className="h-8"
             onClick={() => { setSection("user"); setFilter("all"); }}
           >
-            My Templates
+            My Agents
             <Badge variant="secondary" className="ml-1.5 h-4 px-1 text-[10px]">
               {userTemplates.length}
             </Badge>
@@ -215,7 +215,7 @@ export function TemplateGallery() {
         {section === "user" && (
           <Button size="sm" className="h-8" onClick={() => setBuilderOpen(true)}>
             <Plus className="mr-1.5 h-3.5 w-3.5" />
-            Create Template
+            Create Agent
           </Button>
         )}
       </div>
@@ -239,8 +239,8 @@ export function TemplateGallery() {
       {filtered.length === 0 ? (
         <div className="py-8 text-center text-sm text-muted-foreground">
           {section === "user"
-            ? "No custom templates yet. Create one or clone a system template."
-            : "No templates match the current filter."}
+            ? "No custom agents yet. Create one or clone a system agent."
+            : "No agents match the current filter."}
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -318,7 +318,7 @@ export function TemplateGallery() {
                         className="h-8 px-2"
                         onClick={() => handleClone(template.id)}
                         disabled={cloning === template.id}
-                        title="Clone to My Templates"
+                        title="Clone to My Agents"
                       >
                         {cloning === template.id ? (
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -333,7 +333,7 @@ export function TemplateGallery() {
                           variant="outline"
                           className="h-8 px-2"
                           onClick={() => setEditTemplate(template)}
-                          title="Edit template"
+                          title="Edit agent"
                         >
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
@@ -342,7 +342,7 @@ export function TemplateGallery() {
                           variant="outline"
                           className="h-8 px-2 text-destructive hover:text-destructive"
                           onClick={() => setDeleteTarget(template)}
-                          title="Delete template"
+                          title="Delete agent"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                         </Button>
@@ -391,7 +391,7 @@ export function TemplateGallery() {
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete template?</AlertDialogTitle>
+            <AlertDialogTitle>Delete agent?</AlertDialogTitle>
             <AlertDialogDescription>
               This will permanently delete &quot;{deleteTarget?.name}&quot;. This action cannot be undone.
             </AlertDialogDescription>

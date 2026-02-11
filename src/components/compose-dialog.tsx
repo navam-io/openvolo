@@ -12,10 +12,12 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TweetInput } from "@/components/tweet-input";
+import { PostInput } from "@/components/post-input";
 import { Loader2, Plus, ListOrdered, AlignLeft } from "lucide-react";
 
-interface TweetItem {
+type Platform = "x" | "linkedin";
+
+interface PostItem {
   id: string;
   body: string;
 }
@@ -27,7 +29,26 @@ interface ComposeDialogProps {
   onSuccess?: () => void;
 }
 
-const MAX_CHARS = 280;
+const PLATFORM_CONFIG: Record<Platform, {
+  maxChars: number;
+  placeholder: string;
+  threadSupport: boolean;
+  label: string;
+}> = {
+  x: {
+    maxChars: 280,
+    placeholder: "What's happening?",
+    threadSupport: true,
+    label: "X",
+  },
+  linkedin: {
+    maxChars: 3000,
+    placeholder: "What do you want to talk about?",
+    threadSupport: false,
+    label: "LinkedIn",
+  },
+};
+
 const MAX_THREAD_SIZE = 25;
 
 export function ComposeDialog({
@@ -36,7 +57,8 @@ export function ComposeDialog({
   draftId,
   onSuccess,
 }: ComposeDialogProps) {
-  const [tweets, setTweets] = useState<TweetItem[]>([
+  const [platform, setPlatform] = useState<Platform>("x");
+  const [posts, setPosts] = useState<PostItem[]>([
     { id: nanoid(), body: "" },
   ]);
   const [threadMode, setThreadMode] = useState(false);
@@ -46,12 +68,14 @@ export function ComposeDialog({
   const [publishProgress, setPublishProgress] = useState<string | null>(null);
   const [loadingDraft, setLoadingDraft] = useState(false);
 
+  const config = PLATFORM_CONFIG[platform];
+
   // Load draft content when draftId changes
   useEffect(() => {
     if (!open) return;
     if (!draftId) {
       // Reset state for new compose
-      setTweets([{ id: nanoid(), body: "" }]);
+      setPosts([{ id: nanoid(), body: "" }]);
       setThreadMode(false);
       setError(null);
       setPublishProgress(null);
@@ -70,12 +94,20 @@ export function ComposeDialog({
         }
 
         const item = data.item;
+
+        // Set platform from draft's platformTarget if available
+        if (item.platformTarget === "linkedin") {
+          setPlatform("linkedin");
+        } else {
+          setPlatform("x");
+        }
+
         // If it has a threadId, fetch thread items
         if (item.threadId) {
           return fetch(`/api/content?threadId=${item.threadId}&status=draft`)
             .then((res) => res.json())
             .then((threadData) => {
-              const items: TweetItem[] = (threadData.items || []).map(
+              const items: PostItem[] = (threadData.items || []).map(
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (ti: any) => ({
                   id: ti.id,
@@ -85,33 +117,33 @@ export function ComposeDialog({
               if (items.length > 1) {
                 setThreadMode(true);
               }
-              setTweets(items.length > 0 ? items : [{ id: nanoid(), body: item.body || "" }]);
+              setPosts(items.length > 0 ? items : [{ id: nanoid(), body: item.body || "" }]);
             });
         }
 
-        setTweets([{ id: item.id, body: item.body || "" }]);
+        setPosts([{ id: item.id, body: item.body || "" }]);
         setThreadMode(false);
       })
       .catch(() => setError("Failed to load draft"))
       .finally(() => setLoadingDraft(false));
   }, [draftId, open]);
 
-  const updateTweet = useCallback((index: number, value: string) => {
-    setTweets((prev) =>
+  const updatePost = useCallback((index: number, value: string) => {
+    setPosts((prev) =>
       prev.map((t, i) => (i === index ? { ...t, body: value } : t))
     );
   }, []);
 
-  const addTweet = useCallback(() => {
-    setTweets((prev) => [...prev, { id: nanoid(), body: "" }]);
+  const addPost = useCallback(() => {
+    setPosts((prev) => [...prev, { id: nanoid(), body: "" }]);
   }, []);
 
-  const removeTweet = useCallback((index: number) => {
-    setTweets((prev) => prev.filter((_, i) => i !== index));
+  const removePost = useCallback((index: number) => {
+    setPosts((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const moveTweet = useCallback((from: number, to: number) => {
-    setTweets((prev) => {
+  const movePost = useCallback((from: number, to: number) => {
+    setPosts((prev) => {
       const next = [...prev];
       const [item] = next.splice(from, 1);
       next.splice(to, 0, item);
@@ -122,21 +154,30 @@ export function ComposeDialog({
   const toggleThreadMode = useCallback(() => {
     setThreadMode((prev) => {
       if (!prev) {
-        // Switching to thread mode: if only 1 tweet, add a second
-        setTweets((t) =>
+        // Switching to thread mode: if only 1 post, add a second
+        setPosts((t) =>
           t.length === 1 ? [...t, { id: nanoid(), body: "" }] : t
         );
       } else {
-        // Switching to single mode: keep only first tweet
-        setTweets((t) => [t[0]]);
+        // Switching to single mode: keep only first post
+        setPosts((t) => [t[0]]);
       }
       return !prev;
     });
   }, []);
 
-  const hasContent = tweets.some((t) => t.body.trim().length > 0);
-  const hasOverflow = tweets.some((t) => t.body.length > MAX_CHARS);
-  const canPublish = hasContent && !hasOverflow && !publishing && !saving;
+  const handlePlatformSwitch = useCallback((p: Platform) => {
+    setPlatform(p);
+    // Disable thread mode when switching to a platform that doesn't support it
+    if (!PLATFORM_CONFIG[p].threadSupport && threadMode) {
+      setThreadMode(false);
+      setPosts((prev) => [prev[0]]);
+    }
+  }, [threadMode]);
+
+  const hasContent = posts.some((t) => t.body.trim().length > 0);
+  const hasOverflow = posts.some((t) => t.body.length > config.maxChars);
+  const canPublish = hasContent && !hasOverflow && !publishing && !saving && platform === "x";
   const canSaveDraft = hasContent && !publishing && !saving;
 
   async function handlePublish() {
@@ -144,7 +185,7 @@ export function ComposeDialog({
     setPublishing(true);
     setError(null);
     setPublishProgress(
-      threadMode ? `Publishing thread (${tweets.length} tweets)...` : "Publishing..."
+      threadMode ? `Publishing thread (${posts.length} posts)...` : "Publishing..."
     );
 
     try {
@@ -152,7 +193,7 @@ export function ComposeDialog({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          tweets: tweets.map((t) => t.body),
+          tweets: posts.map((t) => t.body),
           draftId: draftId || undefined,
         }),
       });
@@ -164,7 +205,7 @@ export function ComposeDialog({
       }
 
       if (data.partial) {
-        setError(`Published ${data.published}/${data.total} tweets. ${data.error}`);
+        setError(`Published ${data.published}/${data.total} posts. ${data.error}`);
         return;
       }
 
@@ -184,13 +225,14 @@ export function ComposeDialog({
     setError(null);
 
     try {
-      const res = await fetch("/api/platforms/x/compose", {
+      const res = await fetch(`/api/platforms/${platform}/compose`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          tweets: tweets.map((t) => t.body),
+          tweets: posts.map((t) => t.body),
           saveAsDraft: true,
           draftId: draftId || undefined,
+          platformTarget: platform,
         }),
       });
 
@@ -214,7 +256,7 @@ export function ComposeDialog({
       <DialogContent className="sm:max-w-xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            Compose
+            {platform === "linkedin" ? "Compose LinkedIn Post" : "Compose Post"}
             {threadMode && (
               <Badge variant="secondary" className="text-xs">
                 Thread
@@ -222,9 +264,11 @@ export function ComposeDialog({
             )}
           </DialogTitle>
           <DialogDescription>
-            {threadMode
-              ? "Create a thread of connected tweets"
-              : "Write and publish a tweet"}
+            {platform === "linkedin"
+              ? "Write a LinkedIn post"
+              : threadMode
+                ? "Create a thread of connected posts"
+                : "Write and publish a post"}
           </DialogDescription>
         </DialogHeader>
 
@@ -234,68 +278,95 @@ export function ComposeDialog({
           </div>
         ) : (
           <div className="space-y-3">
-            {/* Thread / Single toggle */}
+            {/* Platform toggle */}
             <div className="flex items-center gap-2">
-              <Button
-                variant={threadMode ? "default" : "outline"}
-                size="sm"
-                onClick={toggleThreadMode}
-              >
-                {threadMode ? (
-                  <>
-                    <AlignLeft className="mr-1.5 h-3.5 w-3.5" />
-                    Single
-                  </>
-                ) : (
-                  <>
-                    <ListOrdered className="mr-1.5 h-3.5 w-3.5" />
-                    Thread
-                  </>
-                )}
-              </Button>
+              <div className="flex items-center rounded-lg border p-0.5">
+                <Button
+                  variant={platform === "x" ? "default" : "ghost"}
+                  size="sm"
+                  className="h-7 text-xs px-3"
+                  onClick={() => handlePlatformSwitch("x")}
+                >
+                  X
+                </Button>
+                <Button
+                  variant={platform === "linkedin" ? "default" : "ghost"}
+                  size="sm"
+                  className="h-7 text-xs px-3"
+                  onClick={() => handlePlatformSwitch("linkedin")}
+                >
+                  LinkedIn
+                </Button>
+              </div>
+
+              {/* Thread / Single toggle — only for platforms that support it */}
+              {config.threadSupport && (
+                <Button
+                  variant={threadMode ? "default" : "outline"}
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={toggleThreadMode}
+                >
+                  {threadMode ? (
+                    <>
+                      <AlignLeft className="mr-1.5 h-3.5 w-3.5" />
+                      Single
+                    </>
+                  ) : (
+                    <>
+                      <ListOrdered className="mr-1.5 h-3.5 w-3.5" />
+                      Thread
+                    </>
+                  )}
+                </Button>
+              )}
             </div>
 
-            {/* Tweet inputs */}
-            {threadMode && (
+            {/* Post inputs */}
+            {threadMode && config.threadSupport && (
               <div className="relative pl-3 border-l-2 border-muted space-y-3">
-                {tweets.map((tweet, i) => (
-                  <TweetInput
-                    key={tweet.id}
-                    value={tweet.body}
-                    onChange={(v) => updateTweet(i, v)}
+                {posts.map((post, i) => (
+                  <PostInput
+                    key={post.id}
+                    value={post.body}
+                    onChange={(v) => updatePost(i, v)}
                     index={i}
-                    total={tweets.length}
+                    total={posts.length}
                     showNumber={true}
-                    onRemove={tweets.length > 1 ? () => removeTweet(i) : undefined}
-                    onMoveUp={i > 0 ? () => moveTweet(i, i - 1) : undefined}
+                    maxChars={config.maxChars}
+                    placeholder={`Post ${i + 1}...`}
+                    onRemove={posts.length > 1 ? () => removePost(i) : undefined}
+                    onMoveUp={i > 0 ? () => movePost(i, i - 1) : undefined}
                     onMoveDown={
-                      i < tweets.length - 1 ? () => moveTweet(i, i + 1) : undefined
+                      i < posts.length - 1 ? () => movePost(i, i + 1) : undefined
                     }
-                    autoFocus={i === tweets.length - 1 && tweets.length > 1}
+                    autoFocus={i === posts.length - 1 && posts.length > 1}
                   />
                 ))}
 
-                {tweets.length < MAX_THREAD_SIZE && (
+                {posts.length < MAX_THREAD_SIZE && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={addTweet}
+                    onClick={addPost}
                     className="text-muted-foreground"
                   >
                     <Plus className="mr-1.5 h-3.5 w-3.5" />
-                    Add tweet
+                    Add post
                   </Button>
                 )}
               </div>
             )}
 
             {!threadMode && (
-              <TweetInput
-                value={tweets[0].body}
-                onChange={(v) => updateTweet(0, v)}
+              <PostInput
+                value={posts[0].body}
+                onChange={(v) => updatePost(0, v)}
                 index={0}
                 total={1}
                 showNumber={false}
+                maxChars={config.maxChars}
+                placeholder={config.placeholder}
                 autoFocus
               />
             )}
@@ -333,10 +404,12 @@ export function ComposeDialog({
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save Draft
           </Button>
-          <Button onClick={handlePublish} disabled={!canPublish}>
-            {publishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {threadMode ? `Publish Thread (${tweets.length})` : "Publish"}
-          </Button>
+          {platform === "x" && (
+            <Button onClick={handlePublish} disabled={!canPublish}>
+              {publishing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {threadMode ? `Publish Thread (${posts.length})` : "Publish"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

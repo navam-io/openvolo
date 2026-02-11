@@ -1,4 +1,4 @@
-import { eq, like, and, or, desc, count, inArray, sql, SQL } from "drizzle-orm";
+import { eq, like, and, or, desc, count, inArray, isNotNull, sql, SQL } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db } from "@/lib/db/client";
 import { contacts, contactIdentities, contentItems, tasks, workflowSteps } from "@/lib/db/schema";
@@ -210,6 +210,21 @@ export function deleteContact(id: string): boolean {
 
 export function countContacts(): number {
   const result = db.select({ value: count() }).from(contacts).get();
+  return result?.value ?? 0;
+}
+
+/** Count non-archived contacts that have an email address. */
+export function countContactsWithEmail(): number {
+  const result = db
+    .select({ value: count() })
+    .from(contacts)
+    .where(
+      and(
+        isNotNull(contacts.email),
+        sql`json_extract(${contacts.metadata}, '$.archived') IS NOT 1`
+      )
+    )
+    .get();
   return result?.value ?? 0;
 }
 

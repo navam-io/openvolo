@@ -4,7 +4,7 @@ import {
   LayoutDashboard,
   Users,
   FileText,
-  GitBranch,
+  Zap,
   BarChart3,
   Settings,
   HelpCircle,
@@ -30,7 +30,7 @@ const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Contacts", href: "/dashboard/contacts", icon: Users },
   { title: "Content", href: "/dashboard/content", icon: FileText },
-  { title: "Workflows", href: "/dashboard/workflows", icon: GitBranch },
+  { title: "Automation", href: "/dashboard/workflows", icon: Zap },
   { title: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },
 ];
 

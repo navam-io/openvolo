@@ -310,7 +310,7 @@ export function ActivateDialog({ template, open, onClose }: ActivateDialogProps)
               ) : (
                 <Play className="mr-2 h-4 w-4" />
               )}
-              {running ? "Starting..." : "Start Workflow"}
+              {running ? "Starting..." : "Run Agent"}
             </Button>
           </div>
         </div>

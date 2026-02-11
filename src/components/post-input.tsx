@@ -6,31 +6,33 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { X, ArrowUp, ArrowDown } from "lucide-react";
 
-interface TweetInputProps {
+interface PostInputProps {
   value: string;
   onChange: (value: string) => void;
   index: number;
   total: number;
   showNumber: boolean;
+  maxChars?: number;
+  placeholder?: string;
   onRemove?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   autoFocus?: boolean;
 }
 
-const MAX_CHARS = 280;
-
-export function TweetInput({
+export function PostInput({
   value,
   onChange,
   index,
   total,
   showNumber,
+  maxChars = 280,
+  placeholder,
   onRemove,
   onMoveUp,
   onMoveDown,
   autoFocus,
-}: TweetInputProps) {
+}: PostInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const length = value.length;
 
@@ -49,16 +51,21 @@ export function TweetInput({
     }
   }, [autoFocus]);
 
+  const warnThreshold = Math.floor(maxChars * 0.93);
   const counterColor =
-    length > MAX_CHARS
+    length > maxChars
       ? "text-red-500"
-      : length >= 260
+      : length >= warnThreshold
         ? "text-yellow-500"
         : "text-muted-foreground";
 
+  const defaultPlaceholder = showNumber
+    ? `Post ${index + 1}...`
+    : "What's happening?";
+
   return (
     <div className="relative group">
-      {/* Tweet number badge */}
+      {/* Post number badge */}
       {showNumber && (
         <div className="flex items-center gap-1 mb-1.5">
           <Badge variant="secondary" className="text-xs">
@@ -94,7 +101,7 @@ export function TweetInput({
                 size="icon"
                 className="h-5 w-5 text-muted-foreground hover:text-destructive"
                 onClick={onRemove}
-                title="Remove tweet"
+                title="Remove post"
               >
                 <X className="h-3 w-3" />
               </Button>
@@ -107,11 +114,7 @@ export function TweetInput({
         ref={textareaRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={
-          showNumber
-            ? `Tweet ${index + 1}...`
-            : "What's happening?"
-        }
+        placeholder={placeholder ?? defaultPlaceholder}
         className="resize-none min-h-[80px] pr-16"
       />
 
@@ -119,7 +122,7 @@ export function TweetInput({
       <span
         className={`absolute bottom-2 right-3 text-xs font-mono ${counterColor}`}
       >
-        {length}/{MAX_CHARS}
+        {length}/{maxChars}
       </span>
     </div>
   );

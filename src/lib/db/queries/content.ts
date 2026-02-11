@@ -1,7 +1,7 @@
-import { eq, ne, and, desc, count, SQL, like } from "drizzle-orm";
+import { eq, ne, and, or, desc, count, SQL, like } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { db } from "@/lib/db/client";
-import { contentItems, contentPosts, engagementMetrics } from "@/lib/db/schema";
+import { contentItems, contentPosts, engagementMetrics, platformAccounts } from "@/lib/db/schema";
 import type { ContentItem, NewContentItem, ContentPost, NewContentPost, ContentItemWithPost, EngagementMetric, PaginatedResult } from "@/lib/db/types";
 
 /** Attach post and latest metrics to content items (batch). */
@@ -76,6 +76,30 @@ export function listContentItems(opts?: {
     conditions.push(
       ne(contentItems.status, opts.excludeStatus as ContentItem["status"])
     );
+  }
+  if (opts?.platform) {
+    // Filter by platform: match via platformAccountId join OR platformTarget for drafts
+    const accountIds = db
+      .select({ id: platformAccounts.id })
+      .from(platformAccounts)
+      .where(eq(platformAccounts.platform, opts.platform as "x" | "linkedin" | "gmail" | "substack"))
+      .all()
+      .map((r) => r.id);
+
+    if (accountIds.length > 0) {
+      const accountConditions = accountIds.map((aid) =>
+        eq(contentItems.platformAccountId, aid)
+      );
+      conditions.push(
+        or(
+          ...accountConditions,
+          eq(contentItems.platformTarget, opts.platform)
+        )!
+      );
+    } else {
+      // No accounts for this platform — only match by platformTarget
+      conditions.push(eq(contentItems.platformTarget, opts.platform));
+    }
   }
   if (opts?.platformAccountId) {
     conditions.push(eq(contentItems.platformAccountId, opts.platformAccountId));

@@ -5,7 +5,7 @@ import { ContentListClient } from "./content-list-client";
 export default async function ContentPage({
   searchParams,
 }: {
-  searchParams: Promise<{ type?: string; origin?: string; status?: string; page?: string }>;
+  searchParams: Promise<{ type?: string; origin?: string; status?: string; platform?: string; page?: string }>;
 }) {
   const params = await searchParams;
   const { page, pageSize } = parsePaginationParams(params);
@@ -13,6 +13,7 @@ export default async function ContentPage({
     contentType: params.type,
     origin: params.origin,
     status: params.status,
+    platform: params.platform,
     excludeStatus: params.origin && !params.status ? "draft" : undefined,
     page,
     pageSize,
@@ -23,7 +24,7 @@ export default async function ContentPage({
       <div>
         <h1 className="text-heading-1">Content</h1>
         <p className="text-muted-foreground mt-1">
-          Browse, import, and manage content across platforms.
+          Browse and manage content across platforms.
         </p>
       </div>
       <ContentListClient
@@ -34,6 +35,7 @@ export default async function ContentPage({
         currentType={params.type}
         currentOrigin={params.origin}
         currentStatus={params.status}
+        currentPlatform={params.platform}
       />
     </div>
   );

@@ -7,7 +7,7 @@ import type { PageContext } from "@/lib/chat/types";
 export function buildChatSystemPrompt(pageContext?: PageContext): string {
   const parts: string[] = [
     `You are the OpenVolo CRM Assistant — a helpful, concise AI assistant embedded in a social CRM application.`,
-    `You help users manage their contacts, content, workflows, analytics, and tasks.`,
+    `You help users manage their contacts, content, automation, analytics, and tasks.`,
     "",
     "## Guidelines",
     "- Be concise. Prefer short answers unless the user asks for detail.",
@@ -38,11 +38,11 @@ export function buildChatSystemPrompt(pageContext?: PageContext): string {
   parts.push("- **query_contacts**: Search and filter contacts by name, email, company, stage, or platform");
   parts.push("- **get_contact**: Get full details for a single contact including identities");
   parts.push("- **query_analytics**: Get CRM metrics — totals, active workflows, pending tasks");
-  parts.push("- **query_workflows**: List workflow runs, filter by type or status");
+  parts.push("- **query_workflows**: List automation runs, filter by type or status");
   parts.push("- **query_content**: List content items, filter by type or platform");
   parts.push("- **create_contact**: Create a new contact record");
   parts.push("- **create_task**: Create a follow-up task for a contact");
-  parts.push("- **start_workflow**: Trigger an agent workflow from a template");
+  parts.push("- **start_workflow**: Trigger an agent from a template");
 
   return parts.join("\n");
 }

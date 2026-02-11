@@ -45,14 +45,14 @@ const PAGE_PROMPTS: Record<string, PromptTuple[]> = {
     ["Find similar contacts in my CRM", Search],
   ],
   "/dashboard/workflows": [
-    ["Show me recently completed workflows", ListChecks],
-    ["Which workflow templates are available?", FileText],
-    ["Start an enrichment workflow", Play],
+    ["Show me recently completed runs", ListChecks],
+    ["Which agents are available to run?", FileText],
+    ["Start an enrichment agent", Play],
   ],
   "/dashboard/workflows/[id]": [
-    ["What is the status of this workflow run?", Activity],
-    ["Show me the results from this workflow", Eye],
-    ["Are there any errors in this workflow?", AlertCircle],
+    ["What is the status of this run?", Activity],
+    ["Show me the results from this run", Eye],
+    ["Are there any errors in this run?", AlertCircle],
   ],
   "/dashboard/content": [
     ["Show my most recent published content", FileText],

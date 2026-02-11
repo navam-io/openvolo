@@ -134,7 +134,7 @@ export function ScheduleDialog({ template, open, onClose }: ScheduleDialogProps)
             Schedule: {template.name}
           </DialogTitle>
           <DialogDescription>
-            Set up a recurring schedule for this workflow template.
+            Set up a recurring schedule for this agent.
           </DialogDescription>
         </DialogHeader>
 

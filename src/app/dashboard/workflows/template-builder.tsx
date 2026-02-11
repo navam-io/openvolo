@@ -144,11 +144,11 @@ export function TemplateBuilder({ open, onClose, onSaved, editTemplate }: Templa
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit Template" : "Create Template"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit Agent" : "Create Agent"}</DialogTitle>
           <DialogDescription>
             {isEdit
-              ? "Modify your custom workflow template."
-              : "Build a custom workflow template for your AI agents."}
+              ? "Modify your custom agent configuration."
+              : "Build a custom AI agent for your workflows."}
           </DialogDescription>
         </DialogHeader>
 

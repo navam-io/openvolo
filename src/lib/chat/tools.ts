@@ -115,7 +115,7 @@ export const chatTools = {
 
   query_workflows: tool({
     description:
-      "List workflow runs. Filter by workflow type (sync, enrich, search, prune, sequence, agent) or status.",
+      "List automation runs. Filter by type (sync, enrich, search, prune, sequence, agent) or status.",
     inputSchema: z.object({
       workflowType: z
         .enum(["sync", "enrich", "search", "prune", "sequence", "agent"])
@@ -266,12 +266,12 @@ export const chatTools = {
 
   start_workflow: tool({
     description:
-      "Trigger an agent workflow. Lists available templates if no templateId given, otherwise starts a run.",
+      "Start an agent from a template. Lists available agents if no templateId given, otherwise starts a run.",
     inputSchema: z.object({
       templateId: z
         .string()
         .optional()
-        .describe("Template ID to run. Omit to list available templates."),
+        .describe("Agent template ID to run. Omit to list available agents."),
       workflowType: z
         .enum(["search", "enrich", "prune", "agent"])
         .optional()
@@ -282,7 +282,7 @@ export const chatTools = {
       if (!templateId) {
         const templates = listTemplates({ status: "active", pageSize: MAX_RESULTS });
         return {
-          message: "Here are the available workflow templates. Provide a templateId to start one.",
+          message: "Here are the available agents. Provide a templateId to start one.",
           templates: templates.data.map((t) => ({
             id: t.id,
             name: t.name,
