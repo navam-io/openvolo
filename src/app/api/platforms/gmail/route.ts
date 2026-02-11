@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getPlatformAccountByPlatform } from "@/lib/db/queries/platform-accounts";
+import { countContactsWithEmail } from "@/lib/db/queries/contacts";
+import { listSyncCursors } from "@/lib/db/queries/sync";
 import { disconnectGmailAccount } from "@/lib/platforms/gmail/auth";
+import { getGoogleContacts } from "@/lib/platforms/gmail/client";
 import { decrypt } from "@/lib/auth/crypto";
 import type { PlatformCredentials } from "@/lib/platforms/adapter";
 
@@ -26,8 +29,29 @@ export async function GET() {
     }
   }
 
+  // Check if Google account has contacts (fast local check, API fallback)
+  let googleContactCount: number | null = null;
+  try {
+    const cursors = listSyncCursors(account.id);
+    const contactsCursor = cursors.find(c => c.dataType === "google_contacts");
+
+    if (contactsCursor && (contactsCursor.totalItemsSynced ?? 0) > 0) {
+      // Previous sync found contacts — skip API call
+      googleContactCount = contactsCursor.totalItemsSynced ?? 0;
+    } else {
+      // No sync yet or last sync found 0 — lightweight API check
+      const res = await getGoogleContacts(account.id, { pageSize: 1 });
+      googleContactCount = res.totalPeople ?? res.connections?.length ?? 0;
+    }
+  } catch {
+    // Token expired or API error — don't restrict (null = unknown)
+    googleContactCount = null;
+  }
+
   return NextResponse.json({
     connected: true,
+    contactsWithEmailCount: countContactsWithEmail(),
+    googleContactCount,
     account: {
       id: account.id,
       displayName: account.displayName,

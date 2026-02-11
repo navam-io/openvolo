@@ -56,6 +56,8 @@ type PlatformStatus = {
   syncCapable: boolean;
   grantedScopes: string;
   hasBrowserSession: boolean;
+  contactsWithEmailCount: number;
+  googleContactCount: number | null;
 };
 
 /** Per-action restriction: reason text, optional navigation target, and whether the button is disabled (no nav target). */
@@ -91,6 +93,20 @@ function getActionRestriction(
         };
       }
       break;
+    case "gm-sync-contacts":
+      if (status.googleContactCount === 0) {
+        return {
+          reason: "No contacts in Google account",
+        };
+      }
+      break;
+    case "gm-sync-metadata":
+      if (status.contactsWithEmailCount === 0) {
+        return {
+          reason: "No contacts with email — Sync Contacts first",
+        };
+      }
+      break;
   }
   return null;
 }
@@ -105,9 +121,9 @@ export function ActionCards() {
 
   // Connection status for each platform (expanded with capability data)
   const [platformStatus, setPlatformStatus] = useState<Record<string, PlatformStatus>>({
-    x: { connected: false, loading: true, syncCapable: false, grantedScopes: "", hasBrowserSession: false },
-    linkedin: { connected: false, loading: true, syncCapable: false, grantedScopes: "", hasBrowserSession: false },
-    gmail: { connected: false, loading: true, syncCapable: false, grantedScopes: "", hasBrowserSession: false },
+    x: { connected: false, loading: true, syncCapable: false, grantedScopes: "", hasBrowserSession: false, contactsWithEmailCount: 999, googleContactCount: null },
+    linkedin: { connected: false, loading: true, syncCapable: false, grantedScopes: "", hasBrowserSession: false, contactsWithEmailCount: 999, googleContactCount: null },
+    gmail: { connected: false, loading: true, syncCapable: false, grantedScopes: "", hasBrowserSession: false, contactsWithEmailCount: 999, googleContactCount: null },
   });
 
   useEffect(() => {
@@ -130,6 +146,8 @@ export function ActionCards() {
           syncCapable: xData.account?.syncCapable ?? false,
           grantedScopes: xData.account?.grantedScopes ?? "",
           hasBrowserSession: !!xEnrichData.hasBrowserSession,
+          contactsWithEmailCount: 999, // Not applicable for X
+          googleContactCount: null,
         },
         linkedin: {
           connected: !!liData.connected,
@@ -137,6 +155,8 @@ export function ActionCards() {
           syncCapable: liData.account?.syncCapable ?? false,
           grantedScopes: liData.account?.grantedScopes ?? "",
           hasBrowserSession: false, // LinkedIn doesn't use browser sessions for actions
+          contactsWithEmailCount: 999, // Not applicable for LinkedIn
+          googleContactCount: null,
         },
         gmail: {
           connected: !!gmData.connected,
@@ -144,6 +164,8 @@ export function ActionCards() {
           syncCapable: true, // Gmail has no tier restrictions
           grantedScopes: gmData.account?.grantedScopes ?? "",
           hasBrowserSession: false,
+          contactsWithEmailCount: gmData.contactsWithEmailCount ?? 0,
+          googleContactCount: gmData.googleContactCount ?? null,
         },
       });
     });
