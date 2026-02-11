@@ -3,6 +3,8 @@ import { getPlatformAccountByPlatform } from "@/lib/db/queries/platform-accounts
 import { listSyncCursors } from "@/lib/db/queries/sync";
 import { syncContactsFromLinkedIn } from "@/lib/platforms/sync-linkedin-contacts";
 import { runSyncWorkflow } from "@/lib/workflows/run-sync-workflow";
+import { decrypt } from "@/lib/auth/crypto";
+import type { PlatformCredentials } from "@/lib/platforms/adapter";
 
 /**
  * POST /api/platforms/linkedin/sync
@@ -32,6 +34,25 @@ export async function POST(req: NextRequest) {
     switch (syncType) {
       case "contacts":
       default: {
+        // Connection sync requires r_connections scope
+        if (account.credentialsEncrypted) {
+          try {
+            const creds: PlatformCredentials = JSON.parse(decrypt(account.credentialsEncrypted));
+            const grantedScopes = (creds.grantedScopes ?? "").replace(/,/g, " ");
+            if (!grantedScopes.includes("r_connections")) {
+              return NextResponse.json(
+                {
+                  error: "Connection sync requires the r_connections scope. Reconnect your LinkedIn account to request this permission, or use CSV import as an alternative.",
+                  code: "SCOPE_RESTRICTED",
+                },
+                { status: 403 }
+              );
+            }
+          } catch {
+            // If we can't read credentials, let the sync attempt proceed and fail naturally
+          }
+        }
+
         const maxPages = body.maxPages ?? 10;
         const { workflowRun, syncResult } = await runSyncWorkflow({
           workflowType: "sync",

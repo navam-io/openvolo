@@ -15,12 +15,14 @@ export async function GET() {
     return NextResponse.json({ connected: false });
   }
 
-  // Extract granted scopes from encrypted credentials
+  // Extract granted scopes + sync capability from encrypted credentials
   let grantedScopes = "";
+  let syncCapable = false;
   if (account.credentialsEncrypted) {
     try {
       const creds: PlatformCredentials = JSON.parse(decrypt(account.credentialsEncrypted));
       grantedScopes = (creds.grantedScopes ?? "").replace(/,/g, " ");
+      syncCapable = grantedScopes.includes("r_connections");
     } catch {
       // Credentials may be corrupted — don't block the status response
     }
@@ -35,6 +37,7 @@ export async function GET() {
       lastSyncedAt: account.lastSyncedAt,
       createdAt: account.createdAt,
       grantedScopes,
+      syncCapable,
     },
   });
 }

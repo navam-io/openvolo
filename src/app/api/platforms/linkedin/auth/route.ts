@@ -3,8 +3,8 @@ import { randomBytes } from "crypto";
 import { getLinkedInClientCredentials } from "@/lib/platforms/linkedin/auth";
 import { saveLinkedInOAuthState } from "@/lib/platforms/linkedin/oauth-state-store";
 
-// LinkedIn OAuth scopes — basic profile + email
-const SCOPES = "openid profile email";
+// LinkedIn OAuth scopes — basic profile + email + connections
+const SCOPES = "openid profile email r_connections";
 
 /**
  * GET /api/platforms/linkedin/auth

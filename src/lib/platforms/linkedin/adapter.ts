@@ -90,8 +90,8 @@ export class LinkedInPlatformAdapter implements PlatformAdapter {
     const state = randomBytes(16).toString("hex");
     saveLinkedInOAuthState(state);
 
-    // Basic scopes: profile + email
-    const scopes = "openid profile email";
+    // Basic scopes: profile + email + connections
+    const scopes = "openid profile email r_connections";
 
     const params = new URLSearchParams({
       response_type: "code",

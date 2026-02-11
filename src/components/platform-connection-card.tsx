@@ -26,6 +26,7 @@ interface PlatformConnectionCardProps {
   status: ConnectionStatus;
   syncCapable?: boolean;
   grantedScopes?: string;
+  showSync?: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
   onSync: () => void;
@@ -41,6 +42,7 @@ const SCOPE_META: Record<string, { label: string; group: string }> = {
   "openid": { label: "OpenID Connect", group: "Auth" },
   "profile": { label: "Read Profile", group: "Profile" },
   "email": { label: "Read Email", group: "Profile" },
+  "r_connections": { label: "Read Connections", group: "Contacts" },
   "w_member_social": { label: "Create Posts", group: "Content" },
   // Google scopes (full URLs — displayed as friendly labels)
   "https://www.googleapis.com/auth/contacts.readonly": { label: "Read Contacts", group: "Contacts" },
@@ -115,6 +117,7 @@ export function PlatformConnectionCard({
   status,
   syncCapable,
   grantedScopes,
+  showSync = true,
   onConnect,
   onDisconnect,
   onSync,
@@ -196,7 +199,7 @@ export function PlatformConnectionCard({
 
           {status === "connected" && (
             <>
-              {syncCapable ? (
+              {showSync && syncCapable ? (
                 <Button
                   onClick={onSync}
                   variant="outline"
@@ -210,7 +213,7 @@ export function PlatformConnectionCard({
                   )}
                   {syncing ? "Syncing..." : "Sync Now"}
                 </Button>
-              ) : onEnableSync ? (
+              ) : showSync && onEnableSync ? (
                 <Button
                   onClick={onEnableSync}
                   variant="outline"
