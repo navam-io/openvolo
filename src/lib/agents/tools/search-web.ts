@@ -13,7 +13,7 @@ import type {
 } from "@/lib/agents/types";
 import type { WorkflowType } from "@/lib/workflows/types";
 
-const BRAVE_API_URL = "https://api.search.brave.com/res/v1/web/search";
+const SERPER_API_URL = "https://google.serper.dev/search";
 const TAVILY_API_URL = "https://api.tavily.com/search";
 
 // --- Key retrieval ---
@@ -36,16 +36,16 @@ function readConfigFile(): Record<string, unknown> {
 }
 
 /**
- * Get the Brave Search API key from env var or encrypted config.
+ * Get the Serper API key from env var or encrypted config.
  */
-export function getBraveApiKey(): string | null {
-  if (process.env.BRAVE_SEARCH_API_KEY) {
-    return process.env.BRAVE_SEARCH_API_KEY;
+export function getSerperApiKey(): string | null {
+  if (process.env.SERPER_API_KEY) {
+    return process.env.SERPER_API_KEY;
   }
   const config = readConfigFile();
-  if (!config.braveSearchApiKey) return null;
+  if (!config.serperApiKey) return null;
   try {
-    return decrypt(config.braveSearchApiKey as string);
+    return decrypt(config.serperApiKey as string);
   } catch {
     return null;
   }
@@ -69,39 +69,34 @@ export function getTavilyApiKey(): string | null {
 
 // --- Provider-specific search functions ---
 
-async function searchBrave(
+async function searchSerper(
   query: string,
   apiKey: string,
   opts: { count: number }
-): Promise<{ results: SearchResult[]; raw?: unknown }> {
-  const params = new URLSearchParams({
-    q: query,
-    count: String(opts.count),
-    text_decorations: "false",
-  });
-
-  const response = await fetch(`${BRAVE_API_URL}?${params}`, {
+): Promise<{ results: SearchResult[] }> {
+  const response = await fetch(SERPER_API_URL, {
+    method: "POST",
     headers: {
-      Accept: "application/json",
-      "Accept-Encoding": "gzip",
-      "X-Subscription-Token": apiKey,
+      "Content-Type": "application/json",
+      "X-API-KEY": apiKey,
     },
+    body: JSON.stringify({ q: query, num: opts.count }),
   });
 
   if (!response.ok) {
     throw new Error(
-      `Brave Search API error: ${response.status} ${response.statusText}`
+      `Serper API error: ${response.status} ${response.statusText}`
     );
   }
 
   const data = await response.json();
-  const webResults = data.web?.results ?? [];
+  const organic = data.organic ?? [];
 
-  const results: SearchResult[] = webResults.map(
-    (r: { title?: string; url?: string; description?: string }) => ({
+  const results: SearchResult[] = organic.map(
+    (r: { title?: string; link?: string; snippet?: string }) => ({
       title: r.title ?? "",
-      url: r.url ?? "",
-      snippet: r.description ?? "",
+      url: r.link ?? "",
+      snippet: r.snippet ?? "",
     })
   );
 
@@ -149,8 +144,8 @@ async function searchTavily(
 
 /** Query patterns that prefer Tavily (deep research). */
 const TAVILY_PATTERNS = /\b(email|who is|profile|contact info|about|background|biography)\b/i;
-/** Query patterns that prefer Brave (broad discovery). */
-const BRAVE_PATTERNS = /\b(top|best|list of|influencers|trending|popular|directory)\b/i;
+/** Query patterns that prefer Serper (broad discovery). */
+const SERPER_PATTERNS = /\b(top|best|list of|influencers|trending|popular|directory)\b/i;
 
 interface RoutingResult {
   provider: SearchProvider;
@@ -168,14 +163,14 @@ export function routeSearchQuery(
   query: string,
   opts?: { workflowType?: WorkflowType; preferredProvider?: SearchProvider }
 ): RoutingResult {
-  const hasBrave = !!getBraveApiKey();
+  const hasSerper = !!getSerperApiKey();
   const hasTavily = !!getTavilyApiKey();
 
   // Hard constraint: only one key available
-  if (hasBrave && !hasTavily) {
-    return { provider: "brave", reason: "only_brave_key_configured" };
+  if (hasSerper && !hasTavily) {
+    return { provider: "serper", reason: "only_serper_key_configured" };
   }
-  if (hasTavily && !hasBrave) {
+  if (hasTavily && !hasSerper) {
     const depth = opts?.workflowType === "enrich" ? "advanced" : "basic";
     return {
       provider: "tavily",
@@ -184,8 +179,8 @@ export function routeSearchQuery(
       includeAnswer: opts?.workflowType === "enrich",
     };
   }
-  if (!hasBrave && !hasTavily) {
-    return { provider: "brave", reason: "no_keys_configured" };
+  if (!hasSerper && !hasTavily) {
+    return { provider: "serper", reason: "no_keys_configured" };
   }
 
   // Explicit preference override
@@ -230,7 +225,7 @@ export function routeSearchQuery(
         includeAnswer: true,
       };
     }
-    return { provider: "brave", reason: `workflow_type_${wfType}` };
+    return { provider: "serper", reason: `workflow_type_${wfType}` };
   }
 
   // Secondary signal: query pattern heuristics (no workflow type context)
@@ -242,12 +237,12 @@ export function routeSearchQuery(
       includeAnswer: true,
     };
   }
-  if (BRAVE_PATTERNS.test(query)) {
-    return { provider: "brave", reason: "query_pattern_broad_discovery" };
+  if (SERPER_PATTERNS.test(query)) {
+    return { provider: "serper", reason: "query_pattern_broad_discovery" };
   }
 
-  // Default: Brave (larger free tier)
-  return { provider: "brave", reason: "default" };
+  // Default: Serper (Google results via fast API)
+  return { provider: "serper", reason: "default" };
 }
 
 // --- Public API ---
@@ -261,7 +256,7 @@ export interface SearchWebOpts {
 }
 
 /**
- * Search the web with smart routing between Brave and Tavily.
+ * Search the web with smart routing between Serper and Tavily.
  * Automatically selects the best provider based on workflow type and query,
  * with transparent failover if the primary provider errors.
  */
@@ -279,12 +274,12 @@ export async function searchWeb(
   });
 
   // Check if any keys are configured
-  const braveKey = getBraveApiKey();
+  const serperKey = getSerperApiKey();
   const tavilyKey = getTavilyApiKey();
 
-  if (!braveKey && !tavilyKey) {
+  if (!serperKey && !tavilyKey) {
     const error =
-      "No search API key configured. Add a Brave or Tavily key in Settings > Search API.";
+      "No search API key configured. Add a Serper or Tavily key in Settings > Search API.";
 
     createWorkflowStep({
       workflowRunId,
@@ -310,7 +305,7 @@ export async function searchWeb(
     routing.provider,
     query,
     { count, searchDepth, includeAnswer },
-    { braveKey, tavilyKey }
+    { serperKey, tavilyKey }
   );
 
   if (primaryResult.success) {
@@ -341,9 +336,9 @@ export async function searchWeb(
 
   // Primary failed — attempt failover
   const fallbackProvider: SearchProvider =
-    routing.provider === "brave" ? "tavily" : "brave";
+    routing.provider === "serper" ? "tavily" : "serper";
   const fallbackKey =
-    fallbackProvider === "brave" ? braveKey : tavilyKey;
+    fallbackProvider === "serper" ? serperKey : tavilyKey;
 
   if (!fallbackKey) {
     // No fallback available — log failure and return empty
@@ -388,7 +383,7 @@ export async function searchWeb(
     fallbackProvider,
     query,
     { count, searchDepth, includeAnswer },
-    { braveKey, tavilyKey }
+    { serperKey, tavilyKey }
   );
 
   if (fallbackResult.success) {
@@ -451,12 +446,12 @@ async function attemptSearch(
   provider: SearchProvider,
   query: string,
   opts: { count: number; searchDepth?: "basic" | "advanced"; includeAnswer?: boolean },
-  keys: { braveKey: string | null; tavilyKey: string | null }
+  keys: { serperKey: string | null; tavilyKey: string | null }
 ): Promise<AttemptResult> {
   try {
-    if (provider === "brave") {
-      if (!keys.braveKey) return { success: false, error: "Brave API key not available" };
-      const result = await searchBrave(query, keys.braveKey, { count: opts.count });
+    if (provider === "serper") {
+      if (!keys.serperKey) return { success: false, error: "Serper API key not available" };
+      const result = await searchSerper(query, keys.serperKey, { count: opts.count });
       return { success: true, data: result };
     } else {
       if (!keys.tavilyKey) return { success: false, error: "Tavily API key not available" };

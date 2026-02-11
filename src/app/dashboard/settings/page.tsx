@@ -112,7 +112,7 @@ function SettingsContent() {
   const [browserValidating, setBrowserValidating] = useState(false);
   const [browserClearing, setBrowserClearing] = useState(false);
 
-  // Search API state — Brave
+  // Search API state — Serper
   const [searchApiKey, setSearchApiKey] = useState("");
   const [searchApi, setSearchApi] = useState<{
     loading: boolean;
@@ -136,13 +136,12 @@ function SettingsContent() {
     fetch("/api/settings/search-api")
       .then((r) => r.json())
       .then((data) => {
-        // Handle new nested response shape (with brave/tavily sub-objects)
-        if (data.brave) {
+        if (data.serper) {
           setSearchApi({
             loading: false,
-            configured: data.brave.configured,
-            source: data.brave.source ?? "none",
-            keyPrefix: data.brave.keyPrefix ?? null,
+            configured: data.serper.configured,
+            source: data.serper.source ?? "none",
+            keyPrefix: data.serper.keyPrefix ?? null,
           });
           setTavilyApi({
             loading: false,
@@ -151,13 +150,7 @@ function SettingsContent() {
             keyPrefix: data.tavily?.keyPrefix ?? null,
           });
         } else {
-          // Backward compat: old flat shape
-          setSearchApi({
-            loading: false,
-            configured: data.configured,
-            source: data.source ?? "none",
-            keyPrefix: data.keyPrefix ?? null,
-          });
+          setSearchApi((prev) => ({ ...prev, loading: false }));
           setTavilyApi((prev) => ({ ...prev, loading: false }));
         }
       })
@@ -176,7 +169,7 @@ function SettingsContent() {
       const res = await fetch("/api/settings/search-api", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "save_key", apiKey: searchApiKey.trim(), provider: "brave" }),
+        body: JSON.stringify({ action: "save_key", apiKey: searchApiKey.trim(), provider: "serper" }),
       });
 
       const data = await res.json();
@@ -187,7 +180,7 @@ function SettingsContent() {
         fetchSearchApiStatus();
       }
     } catch {
-      setError("Failed to save Brave Search API key");
+      setError("Failed to save Serper API key");
     } finally {
       setSearchApiSaving(false);
     }
@@ -197,7 +190,7 @@ function SettingsContent() {
     await fetch("/api/settings/search-api", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "clear_key", provider: "brave" }),
+      body: JSON.stringify({ action: "clear_key", provider: "serper" }),
     });
     fetchSearchApiStatus();
   }
@@ -757,26 +750,26 @@ function SettingsContent() {
         </CardContent>
       </Card>
 
-      {/* Brave Search API Key */}
+      {/* Serper API Key */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="space-y-1">
               <CardTitle className="flex items-center gap-2">
                 <Search className="h-5 w-5" />
-                Brave Search API Key
+                Serper API Key
               </CardTitle>
               <CardDescription>
                 Used for broad discovery queries (prospecting, trending topics). Get a free key at{" "}
                 <a
-                  href="https://brave.com/search/api/"
+                  href="https://serper.dev"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="underline"
                 >
-                  brave.com/search/api
+                  serper.dev
                 </a>
-                {" "}(2,000 free queries/month).
+                {" "}(2,500 free queries, one-time).
               </CardDescription>
             </div>
             {searchApi.loading ? (
@@ -823,11 +816,11 @@ function SettingsContent() {
           ) : (
             <>
               <div className="space-y-2">
-                <Label htmlFor="search-api-key">Brave Search API Key</Label>
+                <Label htmlFor="search-api-key">Serper API Key</Label>
                 <Input
                   id="search-api-key"
                   type="password"
-                  placeholder="BSA..."
+                  placeholder="Enter your Serper API key"
                   value={searchApiKey}
                   onChange={(e) => setSearchApiKey(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSearchApiSave()}
@@ -841,7 +834,7 @@ function SettingsContent() {
                 Save & Validate
               </Button>
               <p className="text-xs text-muted-foreground">
-                Or set <code className="rounded bg-muted px-1 py-0.5 text-xs">BRAVE_SEARCH_API_KEY</code> in <code className="rounded bg-muted px-1 py-0.5 text-xs">.env.local</code> and restart.
+                Or set <code className="rounded bg-muted px-1 py-0.5 text-xs">SERPER_API_KEY</code> in <code className="rounded bg-muted px-1 py-0.5 text-xs">.env.local</code> and restart.
               </p>
             </>
           )}

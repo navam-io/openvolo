@@ -1,7 +1,7 @@
 import type { WorkflowType } from "@/lib/workflows/types";
 
 /** Search provider for web search routing. */
-export type SearchProvider = "brave" | "tavily";
+export type SearchProvider = "serper" | "tavily";
 
 /** Configuration for an agent workflow run. */
 export interface AgentRunConfig {

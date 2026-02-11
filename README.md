@@ -53,7 +53,7 @@ Create, update, and track tasks with status and priority. Link tasks to contacts
 Three-tab Automation page — **Agents** (gallery + builder), **Actions** (platform sync operations), **Runs** (execution history). Six workflow types: sync, enrich, search, prune, sequence, and agent. Agent gallery with 10 seed agents (3 search, 3 enrich, 2 prune, plus user-created), activation dialog for quick setup. User agent builder lets you clone any system agent and customize it. Actions tab consolidates all sync operations (X, LinkedIn, Gmail) with platform connection awareness. Four visualization modes (list, kanban, swimlane, graph) with run/step observability and per-step cost tracking. Cron-based workflow scheduling with presets, custom expressions, and a 60-second background runner.
 
 ### AI Agent Runner
-Eight agent tools — url-fetch (Cheerio), browser-scrape (Playwright), search-web (Brave + Tavily), enrich-contact, update-progress, archive-contact (prune workflows), save-draft (AI content generation), and engage-post (template-driven engagement). Domain-based routing engine (e.g. x.com → browser, wikipedia → fetch) with automatic escalation on failure.
+Eight agent tools — url-fetch (Cheerio), browser-scrape (Playwright), search-web (Serper + Tavily), enrich-contact, update-progress, archive-contact (prune workflows), save-draft (AI content generation), and engage-post (template-driven engagement). Domain-based routing engine (e.g. x.com → browser, wikipedia → fetch) with automatic escalation on failure.
 
 ### Prune & Archive
 Metadata-based contact archiving from prune workflows — contacts are soft-archived (restorable, not deleted). Archive and restore from workflow detail or individual contact pages. "Show Archived" toggle in the contacts list with visual indicators for archived rows.
@@ -62,7 +62,7 @@ Metadata-based contact archiving from prune workflows — contacts are soft-arch
 Cron-based scheduling with common presets (hourly, daily, weekly) and custom cron expressions. Next-run preview and per-template config overrides. Auto-execution via a 60-second background runner initialized through Next.js instrumentation.
 
 ### Smart Search
-Dual search providers: Brave for broad discovery, Tavily for deep research. Intelligent routing by workflow type and query patterns with automatic failover. Combined 3,000 free queries/month across both providers.
+Dual search providers: Serper for broad discovery (Google results), Tavily for deep research. Intelligent routing by workflow type and query patterns with automatic failover. Combined free tiers across both providers.
 
 ### Analytics Dashboard
 Five-tab dashboard — Overview, Agents, Engagement, Content, Sync Health. Six reusable chart components (area, bar, donut, ranked table, stat cards, skeleton). Time range filtering across all tabs.
@@ -105,7 +105,7 @@ GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
 # Web search (optional — for agent workflows)
-BRAVE_SEARCH_API_KEY=
+SERPER_API_KEY=
 TAVILY_API_KEY=
 ```
 

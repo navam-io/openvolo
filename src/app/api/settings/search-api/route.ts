@@ -24,15 +24,15 @@ interface ProviderStatus {
   keyPrefix: string | null;
 }
 
-function getBraveStatus(): ProviderStatus {
-  if (process.env.BRAVE_SEARCH_API_KEY) {
-    const key = process.env.BRAVE_SEARCH_API_KEY;
+function getSerperStatus(): ProviderStatus {
+  if (process.env.SERPER_API_KEY) {
+    const key = process.env.SERPER_API_KEY;
     return { configured: true, source: "env_var", keyPrefix: key.slice(0, 8) + "...****" };
   }
   const config = readConfig();
-  if (config.braveSearchApiKey) {
+  if (config.serperApiKey) {
     try {
-      const key = decrypt(config.braveSearchApiKey as string);
+      const key = decrypt(config.serperApiKey as string);
       return { configured: true, source: "config", keyPrefix: key.slice(0, 8) + "...****" };
     } catch {
       return { configured: false, source: "none", keyPrefix: null };
@@ -60,30 +60,30 @@ function getTavilyStatus(): ProviderStatus {
 
 /**
  * GET /api/settings/search-api
- * Check configuration status for both Brave and Tavily search providers.
+ * Check configuration status for both Serper and Tavily search providers.
  */
 export async function GET() {
-  const brave = getBraveStatus();
+  const serper = getSerperStatus();
   const tavily = getTavilyStatus();
 
   return NextResponse.json({
-    configured: brave.configured || tavily.configured,
-    brave,
+    configured: serper.configured || tavily.configured,
+    serper,
     tavily,
   });
 }
 
 /**
  * POST /api/settings/search-api
- * Save or clear a search API key. Accepts `provider` field ("brave" | "tavily").
- * Defaults to "brave" for backward compatibility.
+ * Save or clear a search API key. Accepts `provider` field ("serper" | "tavily").
+ * Defaults to "serper".
  */
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const { action, apiKey, provider: rawProvider } = body;
-  const provider = rawProvider ?? "brave";
+  const provider = rawProvider ?? "serper";
 
-  if (provider !== "brave" && provider !== "tavily") {
+  if (provider !== "serper" && provider !== "tavily") {
     return NextResponse.json({ error: "Invalid provider" }, { status: 400 });
   }
 
@@ -93,17 +93,16 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate by making a test request
-    if (provider === "brave") {
+    if (provider === "serper") {
       try {
-        const res = await fetch(
-          `https://api.search.brave.com/res/v1/web/search?q=test&count=1`,
-          {
-            headers: {
-              Accept: "application/json",
-              "X-Subscription-Token": apiKey,
-            },
-          }
-        );
+        const res = await fetch("https://google.serper.dev/search", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-API-KEY": apiKey,
+          },
+          body: JSON.stringify({ q: "test", num: 1 }),
+        });
 
         if (res.status === 401 || res.status === 403) {
           return NextResponse.json(
@@ -114,19 +113,19 @@ export async function POST(req: NextRequest) {
 
         if (!res.ok) {
           return NextResponse.json(
-            { error: `Brave API returned ${res.status}` },
+            { error: `Serper API returned ${res.status}` },
             { status: 400 }
           );
         }
       } catch {
         return NextResponse.json(
-          { error: "Could not reach Brave Search API" },
+          { error: "Could not reach Serper API" },
           { status: 400 }
         );
       }
 
       const config = readConfig();
-      config.braveSearchApiKey = encrypt(apiKey);
+      config.serperApiKey = encrypt(apiKey);
       writeConfig(config);
     } else {
       // Tavily validation
@@ -167,8 +166,8 @@ export async function POST(req: NextRequest) {
 
   if (action === "clear_key") {
     const config = readConfig();
-    if (provider === "brave") {
-      delete config.braveSearchApiKey;
+    if (provider === "serper") {
+      delete config.serperApiKey;
     } else {
       delete config.tavilyApiKey;
     }

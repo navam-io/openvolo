@@ -230,7 +230,7 @@ Data:
 
 Environment variables:
   ANTHROPIC_API_KEY    Claude AI (required for agents + chat)
-  BRAVE_SEARCH_API_KEY Brave Search (broad discovery)
+  SERPER_API_KEY       Serper Search (broad discovery)
   TAVILY_API_KEY       Tavily Search (deep research)
 `;
 
