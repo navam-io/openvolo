@@ -48,7 +48,20 @@ const PLATFORM_LABELS: Record<string, string> = {
   gmail: "Gmail / Google",
 };
 
+const ACTION_STAT_MAP: Record<string, { dataTypes: string[]; label: string }> = {
+  "x-sync-posts":        { dataTypes: ["tweets"],                label: "posts synced" },
+  "x-sync-mentions":     { dataTypes: ["mentions"],              label: "mentions synced" },
+  "x-sync-contacts":     { dataTypes: ["followers", "following"], label: "contacts synced" },
+  "x-enrich":            { dataTypes: ["x_profiles"],            label: "profiles enriched" },
+  "x-enrich-low":        { dataTypes: ["x_profiles"],            label: "profiles enriched" },
+  "li-sync-connections": { dataTypes: ["connections"],            label: "connections synced" },
+  "gm-sync-contacts":   { dataTypes: ["google_contacts"],        label: "contacts synced" },
+  "gm-sync-metadata":   { dataTypes: ["gmail_metadata"],         label: "contacts enriched" },
+};
+
 const PLATFORM_GROUPS = ["x", "linkedin", "gmail"] as const;
+
+type SyncStat = { totalSynced: number; lastSyncedAt: number | null };
 
 type PlatformStatus = {
   connected: boolean;
@@ -58,6 +71,7 @@ type PlatformStatus = {
   hasBrowserSession: boolean;
   contactsWithEmailCount: number;
   googleContactCount: number | null;
+  syncStats: Record<string, SyncStat>;
 };
 
 /** Per-action restriction: reason text, optional navigation target, and whether the button is disabled (no nav target). */
@@ -111,6 +125,38 @@ function getActionRestriction(
   return null;
 }
 
+function getActionStats(
+  actionId: string,
+  syncStats: Record<string, SyncStat>
+): { total: number; lastSyncedAt: number | null } | null {
+  const mapping = ACTION_STAT_MAP[actionId];
+  if (!mapping) return null;
+
+  let total = 0;
+  let lastSyncedAt: number | null = null;
+  for (const dt of mapping.dataTypes) {
+    const stat = syncStats[dt];
+    if (stat) {
+      total += stat.totalSynced;
+      if (stat.lastSyncedAt && (!lastSyncedAt || stat.lastSyncedAt > lastSyncedAt)) {
+        lastSyncedAt = stat.lastSyncedAt;
+      }
+    }
+  }
+
+  return total > 0 || lastSyncedAt ? { total, lastSyncedAt } : null;
+}
+
+function formatRelativeTime(unixSeconds: number): string {
+  const now = Math.floor(Date.now() / 1000);
+  const diff = now - unixSeconds;
+  if (diff < 60) return "just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+  return new Date(unixSeconds * 1000).toLocaleDateString();
+}
+
 export function ActionCards() {
   const router = useRouter();
   const [running, setRunning] = useState<string | null>(null);
@@ -121,9 +167,9 @@ export function ActionCards() {
 
   // Connection status for each platform (expanded with capability data)
   const [platformStatus, setPlatformStatus] = useState<Record<string, PlatformStatus>>({
-    x: { connected: false, loading: true, syncCapable: false, grantedScopes: "", hasBrowserSession: false, contactsWithEmailCount: 999, googleContactCount: null },
-    linkedin: { connected: false, loading: true, syncCapable: false, grantedScopes: "", hasBrowserSession: false, contactsWithEmailCount: 999, googleContactCount: null },
-    gmail: { connected: false, loading: true, syncCapable: false, grantedScopes: "", hasBrowserSession: false, contactsWithEmailCount: 999, googleContactCount: null },
+    x: { connected: false, loading: true, syncCapable: false, grantedScopes: "", hasBrowserSession: false, contactsWithEmailCount: 999, googleContactCount: null, syncStats: {} },
+    linkedin: { connected: false, loading: true, syncCapable: false, grantedScopes: "", hasBrowserSession: false, contactsWithEmailCount: 999, googleContactCount: null, syncStats: {} },
+    gmail: { connected: false, loading: true, syncCapable: false, grantedScopes: "", hasBrowserSession: false, contactsWithEmailCount: 999, googleContactCount: null, syncStats: {} },
   });
 
   useEffect(() => {
@@ -139,6 +185,15 @@ export function ActionCards() {
       const gmData = gmRes.status === "fulfilled" ? gmRes.value : {};
       const xEnrichData = xEnrichRes.status === "fulfilled" ? xEnrichRes.value : {};
 
+      // Merge X enrich data into X sync stats
+      const xSyncStats = xData.syncStats ?? {};
+      if (xEnrichData.enrichment) {
+        xSyncStats["x_profiles"] = {
+          totalSynced: xEnrichData.enrichment.totalEnriched ?? 0,
+          lastSyncedAt: xEnrichData.enrichment.lastEnrichedAt ?? null,
+        };
+      }
+
       setPlatformStatus({
         x: {
           connected: !!xData.connected,
@@ -146,26 +201,29 @@ export function ActionCards() {
           syncCapable: xData.account?.syncCapable ?? false,
           grantedScopes: xData.account?.grantedScopes ?? "",
           hasBrowserSession: !!xEnrichData.hasBrowserSession,
-          contactsWithEmailCount: 999, // Not applicable for X
+          contactsWithEmailCount: 999,
           googleContactCount: null,
+          syncStats: xSyncStats,
         },
         linkedin: {
           connected: !!liData.connected,
           loading: false,
           syncCapable: liData.account?.syncCapable ?? false,
           grantedScopes: liData.account?.grantedScopes ?? "",
-          hasBrowserSession: false, // LinkedIn doesn't use browser sessions for actions
-          contactsWithEmailCount: 999, // Not applicable for LinkedIn
+          hasBrowserSession: false,
+          contactsWithEmailCount: 999,
           googleContactCount: null,
+          syncStats: liData.syncStats ?? {},
         },
         gmail: {
           connected: !!gmData.connected,
           loading: false,
-          syncCapable: true, // Gmail has no tier restrictions
+          syncCapable: true,
           grantedScopes: gmData.account?.grantedScopes ?? "",
           hasBrowserSession: false,
           contactsWithEmailCount: gmData.contactsWithEmailCount ?? 0,
           googleContactCount: gmData.googleContactCount ?? null,
+          syncStats: gmData.syncStats ?? {},
         },
       });
     });
@@ -349,6 +407,20 @@ export function ActionCards() {
                       <p className="text-xs text-muted-foreground line-clamp-2">
                         {action.description}
                       </p>
+
+                      {(() => {
+                        const stats = getActionStats(action.id, status.syncStats);
+                        if (!stats) return null;
+                        const mapping = ACTION_STAT_MAP[action.id];
+                        return (
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span>{stats.total} {mapping.label}</span>
+                            {stats.lastSyncedAt && (
+                              <span>Last: {formatRelativeTime(stats.lastSyncedAt)}</span>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {restriction && (
                         <p className="text-xs text-amber-600 dark:text-amber-400">

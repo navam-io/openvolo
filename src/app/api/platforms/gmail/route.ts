@@ -29,10 +29,18 @@ export async function GET() {
     }
   }
 
-  // Check if Google account has contacts (fast local check, API fallback)
+  // Build sync stats for action cards + check Google contact count
+  const cursors = listSyncCursors(account.id);
+  const syncStats: Record<string, { totalSynced: number; lastSyncedAt: number | null }> = {};
+  for (const c of cursors) {
+    syncStats[c.dataType] = {
+      totalSynced: c.totalItemsSynced ?? 0,
+      lastSyncedAt: c.lastSyncCompletedAt,
+    };
+  }
+
   let googleContactCount: number | null = null;
   try {
-    const cursors = listSyncCursors(account.id);
     const contactsCursor = cursors.find(c => c.dataType === "google_contacts");
 
     if (contactsCursor && (contactsCursor.totalItemsSynced ?? 0) > 0) {
@@ -50,6 +58,7 @@ export async function GET() {
 
   return NextResponse.json({
     connected: true,
+    syncStats,
     contactsWithEmailCount: countContactsWithEmail(),
     googleContactCount,
     account: {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getPlatformAccountByPlatform } from "@/lib/db/queries/platform-accounts";
+import { listSyncCursors } from "@/lib/db/queries/sync";
 import { disconnectLinkedInAccount } from "@/lib/platforms/linkedin/auth";
 import { decrypt } from "@/lib/auth/crypto";
 import type { PlatformCredentials } from "@/lib/platforms/adapter";
@@ -28,8 +29,18 @@ export async function GET() {
     }
   }
 
+  const cursors = listSyncCursors(account.id);
+  const syncStats: Record<string, { totalSynced: number; lastSyncedAt: number | null }> = {};
+  for (const c of cursors) {
+    syncStats[c.dataType] = {
+      totalSynced: c.totalItemsSynced ?? 0,
+      lastSyncedAt: c.lastSyncCompletedAt,
+    };
+  }
+
   return NextResponse.json({
     connected: true,
+    syncStats,
     account: {
       id: account.id,
       displayName: account.displayName,
