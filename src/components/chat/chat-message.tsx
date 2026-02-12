@@ -2,7 +2,6 @@
 
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Bot, User } from "lucide-react";
 import { ChatToolResult } from "@/components/chat/chat-tool-result";
 import { cn } from "@/lib/utils";
 import type { UIMessage } from "ai";
@@ -15,17 +14,8 @@ export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
 
   return (
-    <div className={cn("flex gap-2.5 px-4 py-2", isUser ? "flex-row-reverse" : "")}>
-      <div
-        className={cn(
-          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full",
-          isUser ? "bg-primary text-primary-foreground" : "bg-muted"
-        )}
-      >
-        {isUser ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
-      </div>
-
-      <div className={cn("min-w-0 max-w-[85%] space-y-1", isUser ? "items-end" : "")}>
+    <div className="px-4 py-1.5">
+      <div className="min-w-0 space-y-1">
         {message.parts.map((part, i) => {
           if (part.type === "text") {
             if (!part.text.trim()) return null;
@@ -36,7 +26,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
                   "rounded-lg px-3 py-2 text-sm prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_table]:text-xs [&_th]:px-2 [&_td]:px-2",
                   isUser
                     ? "bg-primary text-primary-foreground"
-                    : "bg-muted"
+                    : "bg-muted/50"
                 )}
               >
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
