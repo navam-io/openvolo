@@ -22,6 +22,7 @@
     "dist/",
     "src/",
     "public/",
+    "guide/",
     "next.config.mjs",
     "tsconfig.json",
     "drizzle.config.ts",

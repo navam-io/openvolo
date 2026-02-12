@@ -8,6 +8,7 @@ import {
   BarChart3,
   Target,
   Settings,
+  BookOpen,
   HelpCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -106,6 +107,22 @@ export function AppSidebar() {
               <Link href="/dashboard/settings">
                 <Settings className="h-4 w-4" />
                 <span>Settings</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              asChild
+              isActive={pathname.startsWith("/dashboard/guide")}
+              className={cn(
+                "font-display font-medium transition-all duration-200",
+                pathname.startsWith("/dashboard/guide") &&
+                  "border-l-2 border-primary bg-primary/8 text-primary"
+              )}
+            >
+              <Link href="/dashboard/guide">
+                <BookOpen className="h-4 w-4" />
+                <span>Guide</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

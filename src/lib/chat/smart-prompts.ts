@@ -19,6 +19,7 @@ import {
   Eye,
   Target,
   Zap,
+  BookOpen,
   type LucideIcon,
 } from "lucide-react";
 import type { PageContext } from "@/lib/chat/types";
@@ -86,6 +87,16 @@ const PAGE_PROMPTS: Record<string, PromptTuple[]> = {
     ["Show me my CRM statistics", Database],
     ["How many contacts do I have?", Users],
   ],
+  "/dashboard/guide": [
+    ["How do I get started with OpenVolo?", BookOpen],
+    ["What AI agents are available?", Zap],
+    ["How does contact enrichment work?", Users],
+  ],
+  "/dashboard/guide/[slug]": [
+    ["Summarize this guide for me", BookOpen],
+    ["What are the key steps in this tutorial?", BookOpen],
+    ["How does this feature connect to other parts of OpenVolo?", Zap],
+  ],
 };
 
 const DEFAULT_KEY = "/dashboard";
@@ -106,6 +117,8 @@ export function getSmartPrompts(ctx: PageContext): SmartPrompt[] {
     key = "/dashboard/content/[id]";
   } else if (ctx.goalId) {
     key = "/dashboard/goals/[id]";
+  } else if (ctx.guideSlug) {
+    key = "/dashboard/guide/[slug]";
   } else {
     // Try exact path match, fall back to default
     key = PAGE_PROMPTS[ctx.path] ? ctx.path : DEFAULT_KEY;

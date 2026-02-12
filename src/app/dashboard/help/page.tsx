@@ -159,6 +159,25 @@ function GettingStartedTab() {
 
   return (
     <div className="space-y-6">
+      {/* Cross-link to User Guide */}
+      <Card className="border-primary/30 bg-primary/5">
+        <CardContent className="flex items-center gap-3 pt-6">
+          <Rocket className="h-5 w-5 text-primary shrink-0" />
+          <div className="flex-1">
+            <p className="text-sm font-medium">
+              Want the full walkthrough?{" "}
+              <Link
+                href="/dashboard/guide"
+                className="text-primary underline underline-offset-2"
+              >
+                Read the User Guide
+              </Link>{" "}
+              for in-depth tutorials covering every feature.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Welcome */}
       <Card>
         <CardHeader>

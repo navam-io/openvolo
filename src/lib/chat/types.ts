@@ -5,4 +5,5 @@ export interface PageContext {
   workflowId?: string;
   contentId?: string;
   goalId?: string;
+  guideSlug?: string;
 }
