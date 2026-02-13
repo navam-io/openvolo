@@ -153,7 +153,8 @@ async function uploadMediaX(page: import("playwright").Page, assetIds: string[])
   const filePaths = resolveMediaPaths(assetIds);
   if (filePaths.length === 0) return;
 
-  const fileInput = page.locator('input[data-testid="fileInput"]');
+  // Use .first() — X renders multiple file inputs on the page
+  const fileInput = page.locator('input[data-testid="fileInput"]').first();
   await fileInput.waitFor({ timeout: 5_000 });
   await fileInput.setInputFiles(filePaths);
 
