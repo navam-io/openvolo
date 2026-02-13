@@ -50,17 +50,15 @@ export async function publishToLinkedIn(request: PublishRequest): Promise<Publis
       throw new PublishError("CAPTCHA or verification challenge detected.", "captcha");
     }
 
-    // Wait for feed to confirm logged-in state
+    // Wait for feed to confirm logged-in state.
+    // Use multiple selectors — LinkedIn changes these frequently.
     await page
-      .waitForSelector(".feed-identity-module", { timeout: 15_000 })
-      .catch(() => {
-        // Fallback: check for any feed content
-        return page.waitForSelector('[data-finite-scroll-hotkey-context="FEED"]', { timeout: 10_000 });
-      });
+      .waitForSelector(".global-nav__me, .scaffold-layout, [data-finite-scroll-hotkey-context=\"FEED\"]", { timeout: 15_000 })
+      .catch(() => null);
 
-    // Click "Start a post" to open compose modal
-    const shareBoxSelector = ".share-box-feed-entry__trigger";
-    const shareBox = page.locator(shareBoxSelector);
+    // Click "Start a post" to open compose modal.
+    // The button lives inside .share-box-feed-entry__top-bar (not __trigger).
+    const shareBox = page.locator(".share-box-feed-entry__top-bar button, button:has-text('Start a post')").first();
     await shareBox.waitFor({ timeout: 10_000 });
     await shareBox.click();
     await sleep(1500);
@@ -137,7 +135,10 @@ export async function publishToLinkedIn(request: PublishRequest): Promise<Publis
   }
 }
 
-/** Upload media files using LinkedIn's file input. */
+/** Upload media files using LinkedIn's file input.
+ * LinkedIn's media flow: click media button → Editor modal opens →
+ * upload file(s) → click Next → returns to compose modal with media attached.
+ */
 async function uploadMediaLinkedIn(
   page: import("playwright").Page,
   assetIds: string[]
@@ -145,26 +146,33 @@ async function uploadMediaLinkedIn(
   const filePaths = resolveMediaPaths(assetIds);
   if (filePaths.length === 0) return;
 
-  // Click the photo/media button to reveal the file input
-  const photoButton = page.locator('button[aria-label="Add a photo"]');
-  const mediaButton = page.locator('button[aria-label="Add media"]');
+  // Set up filechooser listener BEFORE clicking — intercepts the OS file dialog.
+  const fileChooserPromise = page.waitForEvent("filechooser", { timeout: 10_000 });
 
-  const photoVisible = await photoButton.isVisible().catch(() => false);
-  if (photoVisible) {
-    await photoButton.click();
-  } else {
-    await mediaButton.waitFor({ timeout: 5_000 });
-    await mediaButton.click();
-  }
-  await sleep(1000);
+  // Click the media button. LinkedIn uses different labels depending on context:
+  // "Add media" (initial), "Add a photo" (compose view), "Add a video" (compose view)
+  const mediaButton = page.locator(
+    'button[aria-label="Add media"], button[aria-label="Add a photo"], button[aria-label="Add a video"]'
+  ).first();
+  await mediaButton.waitFor({ timeout: 5_000 });
+  await mediaButton.click();
 
-  // Find the file input and set files
-  const fileInput = page.locator('input[type="file"]').first();
-  await fileInput.waitFor({ timeout: 5_000 });
-  await fileInput.setInputFiles(filePaths);
+  // Intercept the file chooser — sets files without the native OS dialog blocking.
+  const fileChooser = await fileChooserPromise;
+  await fileChooser.setFiles(filePaths);
 
-  // Wait for upload to process
-  await sleep(5000);
+  // Wait for upload to process in the Editor modal
+  await sleep(3000);
+
+  // LinkedIn shows an Editor modal after upload. Click "Next" to return to compose.
+  const nextButton = page.locator(
+    'button[aria-label="Next"], button.share-box-footer__primary-btn:has-text("Next")'
+  ).first();
+  await nextButton.waitFor({ timeout: 10_000 });
+  await nextButton.click();
+
+  // Wait for compose modal to re-render with media attached
+  await sleep(2000);
 }
 
 /** Attempt to verify a post was published by checking the LinkedIn feed. */
@@ -178,15 +186,14 @@ async function verifyLinkedInPost(
     });
     await sleep(2000);
 
-    // Look for the most recent post activity link
+    // Look for the most recent post — try activity links, then fall back to profile links
     const activityLink = await page
-      .locator('.feed-shared-update-v2 a[href*="/feed/update/"]')
+      .locator('.feed-shared-update-v2 a[href*="activity"], .feed-shared-update-v2 a[href*="/feed/update/"]')
       .first()
-      .getAttribute("href", { timeout: 10_000 })
+      .getAttribute("href", { timeout: 5_000 })
       .catch(() => null);
 
     if (activityLink) {
-      // Extract activity ID from the URL
       const match = activityLink.match(/activity[:-](\d+)/);
       const platformPostId = match?.[1] ?? null;
       const platformUrl = activityLink.startsWith("http")
@@ -200,6 +207,7 @@ async function verifyLinkedInPost(
       };
     }
 
+    // Post likely succeeded even without a verifiable link
     return { success: true };
   } catch {
     return { success: true };

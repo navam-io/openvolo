@@ -1,6 +1,6 @@
 import { join } from "path";
 import { homedir } from "os";
-import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, readdirSync } from "fs";
 import { chromium, type BrowserContext, type Browser } from "playwright";
 import { encrypt, decrypt } from "@/lib/auth/crypto";
 import { randomViewport } from "@/lib/browser/anti-detection";
@@ -30,8 +30,8 @@ const PLATFORM_CONFIG: Record<
   linkedin: {
     loginUrl: "https://www.linkedin.com/login",
     homeUrl: "https://www.linkedin.com/feed/",
-    loggedInSelector: ".feed-identity-module",
-    loggedOutSelector: ".sign-in-form",
+    loggedInSelector: ".global-nav__me, .scaffold-layout__main, [data-test-icon=\"nav-home-icon\"]",
+    loggedOutSelector: ".sign-in-form, #username",
   },
 };
 
@@ -81,11 +81,23 @@ export function clearSession(platform: BrowserPlatform): void {
  * The user logs in themselves (handles 2FA, CAPTCHA).
  * Returns the captured session once the user navigates to the home page.
  */
+/** Remove Chromium singleton lock files left by crashed/hung Playwright processes. */
+function clearStaleLocks(profileDir: string): void {
+  const lockFiles = ["SingletonLock", "SingletonSocket", "SingletonCookie"];
+  for (const name of lockFiles) {
+    const p = join(profileDir, name);
+    try { unlinkSync(p); } catch { /* ignore if missing */ }
+  }
+}
+
 export async function setupSession(platform: BrowserPlatform): Promise<BrowserSession> {
   const config = PLATFORM_CONFIG[platform];
   const viewport = randomViewport();
   const profileDir = join(PROFILES_DIR, platform);
   mkdirSync(profileDir, { recursive: true });
+
+  // Clear stale locks from crashed/hung previous Playwright processes
+  clearStaleLocks(profileDir);
 
   // Use persistent context with system Chrome to avoid bot detection.
   // Persistent context keeps login state between runs (like a real user).
@@ -100,6 +112,7 @@ export async function setupSession(platform: BrowserPlatform): Promise<BrowserSe
     });
   } catch {
     // Fallback: system Chrome unavailable, use bundled Chromium with stealth args
+    clearStaleLocks(profileDir);
     context = await chromium.launchPersistentContext(profileDir, {
       headless: false,
       viewport,
@@ -116,9 +129,25 @@ export async function setupSession(platform: BrowserPlatform): Promise<BrowserSe
 
   await page.goto(config.loginUrl, { waitUntil: "domcontentloaded" });
 
-  // Wait for user to complete login — detect by home page logged-in element
-  // Generous timeout: manual login can take a while with 2FA
-  await page.waitForSelector(config.loggedInSelector, { timeout: 300_000 });
+  // Check if already logged in (persistent context may have valid cookies).
+  // If URL already redirected away from login, skip waiting for manual login.
+  const currentUrl = page.url();
+  const alreadyLoggedIn = !currentUrl.includes("/login") && !currentUrl.includes("/checkpoint");
+
+  if (!alreadyLoggedIn) {
+    // Wait for user to complete login — detect by logged-in element OR URL change.
+    // Race: element selector vs URL leaving the login page. Generous timeout for 2FA.
+    await Promise.race([
+      page.waitForSelector(config.loggedInSelector, { timeout: 300_000 }).catch(() => null),
+      page.waitForURL((url) => {
+        const path = url.pathname;
+        return !path.includes("/login") && !path.includes("/checkpoint") && path !== "/";
+      }, { timeout: 300_000 }),
+    ]);
+  }
+
+  // Let the page fully load before capturing cookies
+  await page.waitForLoadState("networkidle").catch(() => null);
 
   // Capture cookies
   const playwrightCookies = await context.cookies();
@@ -151,17 +180,26 @@ export async function setupSession(platform: BrowserPlatform): Promise<BrowserSe
 }
 
 /**
- * Create a headless Playwright context with stored session cookies.
- * Used by scrapers for actual profile navigation.
- * Uses stealth args to avoid bot detection during scraping.
+ * Create a headed Playwright context with stored session cookies.
+ * Used by scrapers and enrichment for actual profile navigation.
+ * Uses system Chrome + stealth args to avoid bot detection.
  */
 export async function createSessionContext(
   session: BrowserSession
 ): Promise<{ browser: Browser; context: BrowserContext }> {
-  const browser = await chromium.launch({
-    headless: true,
-    args: STEALTH_ARGS,
-  });
+  let browser: Browser;
+  try {
+    browser = await chromium.launch({
+      headless: false,
+      channel: "chrome",
+      args: STEALTH_ARGS,
+    });
+  } catch {
+    browser = await chromium.launch({
+      headless: false,
+      args: STEALTH_ARGS,
+    });
+  }
   const context = await browser.newContext({
     viewport: session.viewport,
     userAgent: session.userAgent,
@@ -208,11 +246,13 @@ export async function validateSession(platform: BrowserPlatform): Promise<boolea
 
     await page.goto(config.homeUrl, { waitUntil: "domcontentloaded", timeout: 30_000 });
 
-    // Check for logged-in indicator
-    const loggedIn = await page
+    // Check for logged-in indicator: try selector first, fall back to URL check
+    const selectorMatch = page
       .waitForSelector(config.loggedInSelector, { timeout: 10_000 })
       .then(() => true)
       .catch(() => false);
+    const urlMatch = page.url().includes("/feed") || page.url().includes("/home");
+    const loggedIn = await selectorMatch || urlMatch;
 
     if (loggedIn) {
       // Update validation timestamp and re-save

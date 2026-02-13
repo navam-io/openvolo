@@ -1,10 +1,10 @@
 import { join } from "path";
 import { homedir } from "os";
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, writeFileSync, unlinkSync } from "fs";
 import { nanoid } from "nanoid";
 import { chromium } from "playwright";
 import type { Page, BrowserContext, Browser } from "playwright";
-import { loadSession, createSessionContext } from "@/lib/browser/session";
+import { loadSession } from "@/lib/browser/session";
 import { randomViewport, sleep } from "@/lib/browser/anti-detection";
 import type { BrowserPlatform, BrowserSession } from "@/lib/browser/types";
 import { getMediaAsset, MEDIA_DIR } from "@/lib/db/queries/media";
@@ -37,21 +37,23 @@ export function ensureSession(platform: BrowserPlatform): BrowserSession {
   return session;
 }
 
-/** Create a Playwright browser context based on publish mode. */
+/** Create a Playwright browser context based on publish mode.
+ * Both modes use persistent context with system Chrome for anti-detection.
+ * Auto mode: headed, auto-closes after posting.
+ * Review mode: headed, waits for user interaction.
+ */
 export async function createPublishContext(
   session: BrowserSession,
   mode: PublishMode
 ): Promise<{ browser: Browser | null; context: BrowserContext; page: Page }> {
-  if (mode === "auto") {
-    // Headless with restored cookies
-    const { browser, context } = await createSessionContext(session);
-    const page = await context.newPage();
-    return { browser, context, page };
-  }
-
-  // Review mode: headed persistent context (user can see and interact)
   const profileDir = join(PROFILES_DIR, session.platform);
   mkdirSync(profileDir, { recursive: true });
+
+  // Clear stale locks from crashed/hung previous processes
+  for (const name of ["SingletonLock", "SingletonSocket", "SingletonCookie"]) {
+    try { unlinkSync(join(profileDir, name)); } catch { /* ignore */ }
+  }
+
   const viewport = randomViewport();
 
   let context: BrowserContext;

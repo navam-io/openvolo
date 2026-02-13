@@ -384,12 +384,16 @@ export function ComposeDialog({
     );
 
     try {
+      const mediaAssetIds = posts.map((t) =>
+        t.media.filter((m) => m.assetId).map((m) => m.assetId!)
+      );
       const res = await fetch("/api/platforms/x/compose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tweets: posts.map((t) => t.body),
           draftId: draftId || undefined,
+          mediaAssetIds,
         }),
       });
 
@@ -452,7 +456,7 @@ export function ComposeDialog({
         return;
       }
 
-      const contentItemId = draftData.contentItemId || draftData.id;
+      const contentItemId = draftData.contentItemId || draftData.id || draftData.items?.[0]?.id;
       if (!contentItemId) {
         setError("Failed to get content item ID from draft save");
         return;

@@ -112,6 +112,17 @@ function SettingsContent() {
   const [browserValidating, setBrowserValidating] = useState(false);
   const [browserClearing, setBrowserClearing] = useState(false);
 
+  // LinkedIn browser session state
+  const [liBrowserSession, setLiBrowserSession] = useState<{
+    loading: boolean;
+    hasSession: boolean;
+    lastValidatedAt: number | null;
+    createdAt: number | null;
+  }>({ loading: true, hasSession: false, lastValidatedAt: null, createdAt: null });
+  const [liBrowserSettingUp, setLiBrowserSettingUp] = useState(false);
+  const [liBrowserValidating, setLiBrowserValidating] = useState(false);
+  const [liBrowserClearing, setLiBrowserClearing] = useState(false);
+
   // Search API state — Serper
   const [searchApiKey, setSearchApiKey] = useState("");
   const [searchApi, setSearchApi] = useState<{
@@ -375,6 +386,84 @@ function SettingsContent() {
     }
   }
 
+  function fetchLiBrowserSession() {
+    fetch("/api/platforms/linkedin/browser-session")
+      .then((r) => r.json())
+      .then((data) => {
+        setLiBrowserSession({
+          loading: false,
+          hasSession: data.hasSession,
+          lastValidatedAt: data.lastValidatedAt ?? null,
+          createdAt: data.createdAt ?? null,
+        });
+      })
+      .catch(() => {
+        setLiBrowserSession((prev) => ({ ...prev, loading: false }));
+      });
+  }
+
+  async function handleLiBrowserSetup() {
+    setLiBrowserSettingUp(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/platforms/linkedin/browser-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "setup" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "LinkedIn browser session setup failed");
+        return;
+      }
+      setSuccessMessage("LinkedIn browser session created successfully!");
+      fetchLiBrowserSession();
+    } catch {
+      setError("LinkedIn browser session setup failed");
+    } finally {
+      setLiBrowserSettingUp(false);
+    }
+  }
+
+  async function handleLiBrowserValidate() {
+    setLiBrowserValidating(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/platforms/linkedin/browser-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "validate" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Validation failed");
+        return;
+      }
+      if (data.isValid) {
+        setSuccessMessage("LinkedIn browser session is valid!");
+      } else {
+        setError("LinkedIn browser session is invalid or expired. Please set up a new session.");
+      }
+      fetchLiBrowserSession();
+    } catch {
+      setError("Validation failed");
+    } finally {
+      setLiBrowserValidating(false);
+    }
+  }
+
+  async function handleLiBrowserClear() {
+    setLiBrowserClearing(true);
+    setError(null);
+    try {
+      await fetch("/api/platforms/linkedin/browser-session", { method: "DELETE" });
+      setLiBrowserSession({ loading: false, hasSession: false, lastValidatedAt: null, createdAt: null });
+    } catch {
+      setError("Failed to clear LinkedIn session");
+    } finally {
+      setLiBrowserClearing(false);
+    }
+  }
 
   useEffect(() => {
     fetchAuth();
@@ -382,6 +471,7 @@ function SettingsContent() {
     fetchLinkedInStatus();
     fetchGmailStatus();
     fetchBrowserSession();
+    fetchLiBrowserSession();
     fetchSearchApiStatus();
   }, []);
 
@@ -1019,15 +1109,15 @@ function SettingsContent() {
 
           <Separator />
 
-          {/* Browser Enrichment */}
+          {/* Browser Sessions */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium flex items-center gap-2">
               <Globe className="h-4 w-4" />
-              Browser Enrichment
+              Browser Sessions
             </h3>
             <p className="text-xs text-muted-foreground">
-              Enrich contacts by scraping X profile pages. Requires a browser session
-              (manual login) to access profile data that the API cannot provide.
+              Browser sessions enable enrichment (scraping profiles) and publishing (posting content).
+              Each platform requires a separate session via manual login.
             </p>
 
             {browserSession.loading ? (
@@ -1118,6 +1208,95 @@ function SettingsContent() {
                   )}
                 </div>
 
+              </div>
+            )}
+
+            {/* LinkedIn Browser Session */}
+            {liBrowserSession.loading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Loading LinkedIn session status...
+              </div>
+            ) : (
+              <div className="rounded-lg border p-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">LinkedIn Browser Session</p>
+                    {liBrowserSession.hasSession ? (
+                      <p className="text-xs text-muted-foreground">
+                        Session active
+                        {liBrowserSession.lastValidatedAt && (
+                          <> &middot; Last validated {formatSyncTime(liBrowserSession.lastValidatedAt)}</>
+                        )}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        No session configured. Required for LinkedIn browser publishing.
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {liBrowserSession.hasSession ? (
+                      <Badge variant="default" className="bg-green-600">
+                        <CheckCircle className="mr-1 h-3 w-3" />
+                        Active
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary">
+                        <XCircle className="mr-1 h-3 w-3" />
+                        Not configured
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {!liBrowserSession.hasSession ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleLiBrowserSetup}
+                      disabled={liBrowserSettingUp}
+                    >
+                      {liBrowserSettingUp ? (
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                      ) : (
+                        <Globe className="mr-1 h-3 w-3" />
+                      )}
+                      {liBrowserSettingUp ? "Opening browser..." : "Setup Session"}
+                    </Button>
+                  ) : (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleLiBrowserValidate}
+                        disabled={liBrowserValidating}
+                      >
+                        {liBrowserValidating ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        ) : (
+                          <CheckCircle className="mr-1 h-3 w-3" />
+                        )}
+                        Validate
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleLiBrowserClear}
+                        disabled={liBrowserClearing}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        {liBrowserClearing ? (
+                          <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        ) : (
+                          <Trash2 className="mr-1 h-3 w-3" />
+                        )}
+                        Clear
+                      </Button>
+                    </>
+                  )}
+                </div>
               </div>
             )}
 

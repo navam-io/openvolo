@@ -139,6 +139,11 @@ export async function xApiFetch<T>(
       throw new XApiRequestError(retryRes.status, err.detail || err.title || "Request failed");
     }
 
+    const retryContentLength = retryRes.headers.get("content-length");
+    if (retryRes.status === 204 || retryContentLength === "0") {
+      return { data: {} } as XApiResponse<T>;
+    }
+
     return retryRes.json();
   }
 
@@ -159,6 +164,12 @@ export async function xApiFetch<T>(
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: res.statusText }));
     throw new XApiRequestError(res.status, err.detail || err.title || "Request failed");
+  }
+
+  // Some endpoints (e.g., media APPEND) return 2xx with no body
+  const contentLength = res.headers.get("content-length");
+  if (res.status === 204 || contentLength === "0") {
+    return { data: {} } as XApiResponse<T>;
   }
 
   return res.json();
@@ -343,25 +354,96 @@ export async function replyToTweet(
   return res.data;
 }
 
+// --- Media Upload ---
+
+/**
+ * Upload a media file to X via the v2 chunked upload API.
+ * Steps: INIT → APPEND → FINALIZE.
+ * Returns the media_id string to include in tweet payloads.
+ */
+export async function uploadMedia(
+  accountId: string,
+  filePath: string,
+  mimeType: string
+): Promise<string> {
+  const { readFileSync, statSync } = await import("fs");
+  const fileBuffer = readFileSync(filePath);
+  const totalBytes = statSync(filePath).size;
+
+  // Determine media category from mime type
+  const mediaCategory = mimeType.startsWith("video/")
+    ? "tweet_video"
+    : mimeType === "image/gif"
+      ? "tweet_gif"
+      : "tweet_image";
+
+  // Step 1: INIT — get a media_id
+  const initForm = new FormData();
+  initForm.append("command", "INIT");
+  initForm.append("media_type", mimeType);
+  initForm.append("total_bytes", String(totalBytes));
+  initForm.append("media_category", mediaCategory);
+
+  const initRes = await xApiFetch<{ id: string }>(
+    accountId,
+    `https://api.x.com/2/media/upload`,
+    { method: "POST", body: initForm }
+  );
+  const mediaId = initRes.data.id;
+
+  // Step 2: APPEND — upload the file data in a single chunk (images are small enough)
+  const blob = new Blob([fileBuffer], { type: mimeType });
+  const appendForm = new FormData();
+  appendForm.append("command", "APPEND");
+  appendForm.append("media_id", mediaId);
+  appendForm.append("segment_index", "0");
+  appendForm.append("media", blob, filePath.split("/").pop() || "media");
+
+  await xApiFetch(
+    accountId,
+    `https://api.x.com/2/media/upload`,
+    { method: "POST", body: appendForm }
+  );
+
+  // Step 3: FINALIZE — complete the upload
+  const finalizeForm = new FormData();
+  finalizeForm.append("command", "FINALIZE");
+  finalizeForm.append("media_id", mediaId);
+
+  await xApiFetch(
+    accountId,
+    `https://api.x.com/2/media/upload`,
+    { method: "POST", body: finalizeForm }
+  );
+
+  return mediaId;
+}
+
 // --- Compose Actions ---
 
-/** Post a single tweet. */
+/** Post a single tweet, optionally with media. */
 export async function postTweet(
   accountId: string,
-  text: string
+  text: string,
+  mediaIds?: string[]
 ): Promise<XTweet> {
+  const payload: Record<string, unknown> = { text };
+  if (mediaIds && mediaIds.length > 0) {
+    payload.media = { media_ids: mediaIds };
+  }
   const res = await xApiFetch<XTweet>(accountId, `/tweets`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(payload),
   });
   return res.data;
 }
 
-/** Post a thread (array of tweet texts). Returns posted tweets in order. */
+/** Post a thread (array of tweet texts), optionally with per-tweet media. */
 export async function postThread(
   accountId: string,
-  tweets: string[]
+  tweets: string[],
+  tweetMediaIds?: string[][]
 ): Promise<{ posted: XTweet[]; error?: string }> {
   const posted: XTweet[] = [];
 
@@ -372,6 +454,12 @@ export async function postThread(
       // Chain each tweet as a reply to the previous one
       if (i > 0) {
         body.reply = { in_reply_to_tweet_id: posted[i - 1].id };
+      }
+
+      // Attach media if provided for this tweet
+      const ids = tweetMediaIds?.[i];
+      if (ids && ids.length > 0) {
+        body.media = { media_ids: ids };
       }
 
       const res = await xApiFetch<XTweet>(accountId, `/tweets`, {

@@ -23,10 +23,19 @@ export async function browserScrape(
     // Dynamically import Playwright to avoid build-time failures
     const { chromium } = await import("playwright");
 
-    const browser = await chromium.launch({
-      headless: true,
-      args: ["--disable-blink-features=AutomationControlled"],
-    });
+    let browser;
+    try {
+      browser = await chromium.launch({
+        headless: false,
+        channel: "chrome",
+        args: ["--disable-blink-features=AutomationControlled"],
+      });
+    } catch {
+      browser = await chromium.launch({
+        headless: false,
+        args: ["--disable-blink-features=AutomationControlled"],
+      });
+    }
 
     const context = await browser.newContext({
       userAgent:

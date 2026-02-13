@@ -3,11 +3,13 @@ import { z } from "zod";
 import { nanoid } from "nanoid";
 import { getPlatformAccountByPlatform } from "@/lib/db/queries/platform-accounts";
 import { createContentItem, updateContentItem, getContentItem, getThreadItems } from "@/lib/db/queries/content";
-import { linkMediaToContent } from "@/lib/db/queries/media";
+import { getMediaAsset, linkMediaToContent, MEDIA_DIR } from "@/lib/db/queries/media";
+import { join } from "path";
 import {
   getAuthenticatedUser,
   postTweet,
   postThread,
+  uploadMedia,
   RateLimitError,
   TierRestrictedError,
 } from "@/lib/platforms/x/client";
@@ -58,8 +60,26 @@ export async function POST(req: NextRequest) {
     }
 
     // --- Publish ---
+
+    // Upload media assets to X and get platform media IDs (per-tweet)
+    const uploadedMediaIds: string[][] = [];
+    if (mediaAssetIds) {
+      for (const tweetAssetIds of mediaAssetIds) {
+        const ids: string[] = [];
+        for (const assetId of tweetAssetIds) {
+          const asset = getMediaAsset(assetId);
+          if (asset) {
+            const filePath = join(MEDIA_DIR, asset.storagePath);
+            const platformMediaId = await uploadMedia(account.id, filePath, asset.mimeType);
+            ids.push(platformMediaId);
+          }
+        }
+        uploadedMediaIds.push(ids);
+      }
+    }
+
     if (isThread) {
-      const result = await postThread(account.id, tweets);
+      const result = await postThread(account.id, tweets, uploadedMediaIds.length > 0 ? uploadedMediaIds : undefined);
       const me = await getAuthenticatedUser(account.id);
 
       // Create content items for each posted tweet
@@ -112,7 +132,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Single tweet
-    const tweet = await postTweet(account.id, tweets[0]);
+    const singleMediaIds = uploadedMediaIds[0]?.length ? uploadedMediaIds[0] : undefined;
+    const tweet = await postTweet(account.id, tweets[0], singleMediaIds);
     const me = await getAuthenticatedUser(account.id);
 
     const item = createContentItem(
